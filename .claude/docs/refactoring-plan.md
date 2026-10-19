@@ -26,13 +26,13 @@
 
 These steps come first because the plan cannot be validated without tests, and because the audit found exploitable issues that must not survive the refactoring.
 
-- [ ] **1. Restore `BagService` search predicates.**
+- [x] **1. Restore `BagService` search predicates.**
   - Revert the uncommitted `String.valueOf(root.get(...))` change and go back to the metamodel (`Bag_.messageTypes`, `MessageType_.name`, `Tag_.tag`, `Tag_.value`, `Topic_.topicName`).
   - Keep `System.lineSeparator()`.
   - *Test:* new `BagServiceTest` case that searches on `messageType`, `tags` and `topicName`.
   - *Rollback:* `git revert`.
 
-- [ ] **2. Measure coverage.**
+- [x] **2. Measure coverage.**
   - Add `jacoco-maven-plugin` (report only, no threshold yet).
   - Upgrade CI to `actions/checkout@v4` and `actions/setup-java@v4` (Temurin 11).
   - *Test:* CI publishes `target/site/jacoco`.
