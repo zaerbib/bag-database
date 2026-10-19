@@ -32,7 +32,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - *Test:* new `BagServiceTest` case that searches on `messageType`, `tags` and `topicName`.
   - *Rollback:* `git revert`.
 
-- [ ] **2. Measure coverage.**
+- [x] **2. Measure coverage.**
   - Add `jacoco-maven-plugin` (report only, no threshold yet).
   - Upgrade CI to `actions/checkout@v4` and `actions/setup-java@v4` (Temurin 11).
   - *Test:* CI publishes `target/site/jacoco`.
