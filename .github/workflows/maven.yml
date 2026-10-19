@@ -27,3 +27,26 @@ jobs:
         name: jacoco-report
         path: target/site/jacoco
         if-no-files-found: warn
+    - name: Publish coverage summary
+      if: always()
+      run: |
+        CSV=target/site/jacoco/jacoco.csv
+        if [ ! -f "$CSV" ]; then
+          echo "No JaCoCo report found." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        PCT='function pct(c, m) { return (c + m) ? sprintf("%.1f%%", 100 * c / (c + m)) : "n/a" }'
+        {
+          echo "## Test coverage (JaCoCo)"
+          echo ""
+          echo "| Package | Instructions | Branches | Lines |"
+          echo "|---|---:|---:|---:|"
+          awk -F, "$PCT"'
+            NR > 1 { im[$2] += $4; ic[$2] += $5; bm[$2] += $6; bc[$2] += $7; lm[$2] += $8; lc[$2] += $9 }
+            END { for (p in im) printf "| %s | %s | %s | %s |\n", p, pct(ic[p], im[p]), pct(bc[p], bm[p]), pct(lc[p], lm[p]) }
+          ' "$CSV" | sort
+          awk -F, "$PCT"'
+            NR > 1 { im += $4; ic += $5; bm += $6; bc += $7; lm += $8; lc += $9 }
+            END { printf "| **Total** | **%s** | **%s** | **%s** |\n", pct(ic, im), pct(bc, bm), pct(lc, lm) }
+          ' "$CSV"
+        } >> "$GITHUB_STEP_SUMMARY"
