@@ -38,15 +38,28 @@ import com.github.swrirobotics.bags.reader.messages.serialization.MessageType;
 import com.github.swrirobotics.bags.reader.messages.serialization.StringType;
 import com.github.swrirobotics.config.ConfigService;
 import com.github.swrirobotics.config.WebAppConfigurationAware;
+import com.github.swrirobotics.persistence.Bag;
+import com.github.swrirobotics.persistence.BagRepository;
+import com.github.swrirobotics.persistence.MessageTypeRepository;
+import com.github.swrirobotics.persistence.Tag;
+import com.github.swrirobotics.persistence.TagRepository;
+import com.github.swrirobotics.persistence.Topic;
+import com.github.swrirobotics.persistence.TopicRepository;
+import com.github.swrirobotics.support.web.BagList;
 import com.github.swrirobotics.support.web.Configuration;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.sql.Timestamp;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,6 +70,14 @@ public class BagServiceTest extends WebAppConfigurationAware {
     BagService myBagService;
     @MockBean
     ConfigService myConfigService;
+    @Autowired
+    BagRepository myBagRepository;
+    @Autowired
+    MessageTypeRepository myMTRepository;
+    @Autowired
+    TagRepository myTagRepository;
+    @Autowired
+    TopicRepository myTopicRepository;
 
     private static final Logger myLogger = LoggerFactory.getLogger(BagServiceTest.class);
 
@@ -117,5 +138,118 @@ public class BagServiceTest extends WebAppConfigurationAware {
         assertEquals(1, color.getRed());
         assertEquals(2, color.getGreen());
         assertEquals(3, color.getBlue());
+    }
+
+    private Bag insertBareBag(String filename, String md5sum) {
+        Bag bag = new Bag();
+        bag.setMd5sum(md5sum);
+        bag.setCreatedOn(new Timestamp(System.currentTimeMillis()));
+        bag.setDuration(0.0);
+        bag.setStartTime(new Timestamp(System.currentTimeMillis()));
+        bag.setEndTime(new Timestamp(System.currentTimeMillis()));
+        bag.setFilename(filename);
+        bag.setPath("/search/");
+        bag.setVersion("2.0");
+        bag.setCompressed(false);
+        bag.setIndexed(true);
+        bag.setMessageCount(0L);
+        bag.setMissing(false);
+        bag.setSize(0L);
+        return myBagRepository.save(bag);
+    }
+
+    private void addTag(Bag bag, String key, String value) {
+        Tag tag = new Tag();
+        tag.setTag(key);
+        tag.setValue(value);
+        tag.setBag(bag);
+        bag.getTags().add(myTagRepository.save(tag));
+    }
+
+    private Long insertSearchableBag() {
+        Bag bag = insertBareBag("search.bag", "searchmd5sum");
+        // Two tags so that the joins produce several rows for the same bag
+        addTag(bag, "SearchTagKey", "SearchTagValue");
+        addTag(bag, "OtherTagKey", "OtherTagValue");
+
+        // Fully qualified to avoid clashing with the bag reader's MessageType
+        var mt = new com.github.swrirobotics.persistence.MessageType();
+        mt.setName("search_msgs/SearchType");
+        mt.setMd5sum("searchtypemd5sum");
+        mt = myMTRepository.save(mt);
+        bag.getMessageTypes().add(mt);
+
+        Topic topic = new Topic();
+        topic.setBag(bag);
+        topic.setMessageCount(0L);
+        topic.setConnectionCount(0L);
+        topic.setType(mt);
+        mt.getTopics().add(topic);
+        topic.setTopicName("/search/topic");
+        topic = myTopicRepository.save(topic);
+        bag.getTopics().add(topic);
+
+        return myBagRepository.save(bag).getId();
+    }
+
+    private List<Long> searchBagIds(String text, String... fields) {
+        BagList result = myBagService.findBagsContainingText(text, fields, null, 1, 100, "ASC", "filename");
+        return result.getBags().stream().map(Bag::getId).collect(Collectors.toList());
+    }
+
+    private void assertFoundOnce(Long bagId, String text, String... fields) {
+        assertEquals(1, Collections.frequency(searchBagIds(text, fields), bagId));
+    }
+
+    private void assertNotFound(Long bagId, String text, String... fields) {
+        assertFalse(searchBagIds(text, fields).contains(bagId));
+    }
+
+    @Test
+    @Transactional
+    public void testFindBagsByMessageType() {
+        Long bagId = insertSearchableBag();
+
+        assertFoundOnce(bagId, "SEARCHTYPE", "messageType");
+        // Text that only exists in the bag's tags and topics
+        assertNotFound(bagId, "searchtagkey", "messageType");
+        assertNotFound(bagId, "/search/topic", "messageType");
+    }
+
+    @Test
+    @Transactional
+    public void testFindBagsByTags() {
+        Long bagId = insertSearchableBag();
+
+        assertFoundOnce(bagId, "searchtagkey", "tags");
+        assertFoundOnce(bagId, "searchtagvalue", "tags");
+        // Text that only exists in the bag's message types and topics
+        assertNotFound(bagId, "searchtype", "tags");
+        assertNotFound(bagId, "/search/topic", "tags");
+    }
+
+    @Test
+    @Transactional
+    public void testFindBagsByTopicName() {
+        Long bagId = insertSearchableBag();
+
+        assertFoundOnce(bagId, "/SEARCH/TOPIC", "topicName");
+        // Text that only exists in the bag's tags and message types
+        assertNotFound(bagId, "searchtagvalue", "topicName");
+        assertNotFound(bagId, "searchtype", "topicName");
+    }
+
+    @Test
+    @Transactional
+    public void testFindBagsByMultipleFields() {
+        Long bagId = insertSearchableBag();
+        // A bag without tags, message types or topics must still be found by the
+        // other fields, since the collections are LEFT joined
+        Long bareBagId = insertBareBag("leftjoin-probe.bag", "leftjoinmd5sum").getId();
+        String[] fields = {"filename", "tags", "messageType", "topicName"};
+
+        assertFoundOnce(bagId, "search", fields);
+        assertFoundOnce(bareBagId, "leftjoin-probe", fields);
+        assertNotFound(bagId, "leftjoin-probe", fields);
     }
 }

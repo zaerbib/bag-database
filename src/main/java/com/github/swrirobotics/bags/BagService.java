@@ -1117,17 +1117,17 @@ public class BagService extends StatusProvider {
         for (String field : fields) {
             switch(field) {
                 case "messageType":
-                    Join<Bag, MessageType> mtJoin = root.join(String.valueOf(root.get("messageTypes")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(mtJoin.get(String.valueOf(root.get("name")))), wildcardText));
+                    Join<Bag, MessageType> mtJoin = root.join(Bag_.messageTypes, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(mtJoin.get(MessageType_.name)), wildcardText));
                     break;
                 case "tags":
-                    Join<Bag, Tag> tagJoin = root.join(String.valueOf(root.get("tags")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(tagJoin.get(String.valueOf(root.get("tag")))), wildcardText));
-                    preds.add(cb.like(cb.lower(tagJoin.get(String.valueOf(root.get("value")))), wildcardText));
+                    Join<Bag, Tag> tagJoin = root.join(Bag_.tags, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(tagJoin.get(Tag_.tag)), wildcardText));
+                    preds.add(cb.like(cb.lower(tagJoin.get(Tag_.value)), wildcardText));
                     break;
                 case "topicName":
-                    Join<Bag, Topic> topicJoin = root.join(String.valueOf(root.get("topics")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(topicJoin.get(String.valueOf(root.get("topicName")))), wildcardText));
+                    Join<Bag, Topic> topicJoin = root.join(Bag_.topics, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(topicJoin.get(Topic_.topicName)), wildcardText));
                     break;
                 default:
                     preds.add(cb.like(cb.lower(root.get(field)), wildcardText));
