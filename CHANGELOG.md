@@ -1,6 +1,7 @@
 # Bag Database changelog
 Unreleased
 - Enforce `@Secured` method security. Modifying bags (update, upload, set/remove tags) now requires a login; saving, running and deleting scripts, `/admin/**` and `/config/**` now require `ROLE_ADMIN` (also for LDAP users). Unauthenticated AJAX requests to protected endpoints get 401 instead of a redirect to the login page.
+- Stop sending secrets to the browser. `/config/get` no longer returns `jdbcPassword`, `adminPassword`, `ldapBindPassword`, `googleApiKey`, `bingKey` or S3 `accessKey`/`secretKey`; saving the configuration with any of these left blank keeps the current value. `/account/current` returns only `id`, `email` and `role`.
 
 3.5.3
 - Updating Docker configuration to reference simplified paths (Thanks danthony06)

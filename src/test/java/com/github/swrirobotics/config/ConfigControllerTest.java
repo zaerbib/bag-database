@@ -59,11 +59,18 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
 
     @Test
     public void getConfig() throws Exception {
+        doReturn(configWithSecrets()).when(myConfigService).getConfiguration();
+
         mockMvc.perform(post("/config/get").with(csrf()))
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.bagPath").value("/bags"))
+            .andExpect(jsonPath("$.data.jdbcPassword").doesNotExist())
+            .andExpect(jsonPath("$.data.googleApiKey").doesNotExist())
+            .andExpect(jsonPath("$.data.bingKey").doesNotExist())
+            .andExpect(jsonPath("$.data.adminPassword").doesNotExist())
+            .andExpect(jsonPath("$.data.ldapBindPassword").doesNotExist())
             .andDo(document("config/{method-name}",
                 preprocessResponse(prettyPrint()),
                 responseFields(
@@ -74,13 +81,9 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
                     fieldWithPath("data.driver").description("JDBC driver class"),
                     fieldWithPath("data.jdbcUsername").description("JDBC user name"),
                     fieldWithPath("data.jdbcUrl").description("JDBC URL"),
-                    fieldWithPath("data.jdbcPassword").description("JDBC password (currently exposed; removed in step 4b)"),
-                    fieldWithPath("data.googleApiKey").description("Google API key (currently exposed; removed in step 4b)"),
                     fieldWithPath("data.scriptTmpPath").description("Temporary directory for script runs"),
                     fieldWithPath("data.useMapQuest").description("Whether to use MapQuest tiles"),
                     fieldWithPath("data.useBing").description("Whether to use Bing tiles"),
-                    fieldWithPath("data.bingKey").description("Bing API key (currently exposed; removed in step 4b)"),
-                    fieldWithPath("data.adminPassword").description("Admin password (currently exposed; removed in step 4b)"),
                     fieldWithPath("data.vehicleNameTopics").description("Topics searched for vehicle names"),
                     fieldWithPath("data.metadataTopics").description("Topics searched for metadata"),
                     fieldWithPath("data.gpsTopics").description("Topics searched for GPS positions"),
@@ -92,7 +95,6 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
                     fieldWithPath("data.tileWidthPx").description("Map tile width in pixels"),
                     fieldWithPath("data.tileHeightPx").description("Map tile height in pixels"),
                     fieldWithPath("data.ldapBindDn").description("LDAP bind DN"),
-                    fieldWithPath("data.ldapBindPassword").description("LDAP bind password (currently exposed; removed in step 4b)"),
                     fieldWithPath("data.ldapSearchBase").description("LDAP search base"),
                     fieldWithPath("data.ldapServer").description("LDAP server URL"),
                     fieldWithPath("data.ldapUserPattern").description("LDAP user DN pattern"),
@@ -118,8 +120,9 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
         mockMvc.perform(post("/config/get").with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.storageConfigurations[0].accessKey").value("AKIAEXAMPLE"))
-            .andExpect(jsonPath("$.data.storageConfigurations[0].secretKey").value("secretExample"))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].bucket").value("bags"))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].accessKey").doesNotExist())
+            .andExpect(jsonPath("$.data.storageConfigurations[0].secretKey").doesNotExist())
             .andDo(document("config/{method-name}",
                 preprocessResponse(prettyPrint()),
                 relaxedResponseFields(
@@ -127,8 +130,6 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
                     fieldWithPath("data.storageConfigurations[].storageId").description("ID of the storage backend"),
                     fieldWithPath("data.storageConfigurations[].isLocal").description("Whether the backend is local"),
                     fieldWithPath("data.storageConfigurations[].dockerPath").description("Path to bags inside script containers"),
-                    fieldWithPath("data.storageConfigurations[].accessKey").description("S3 access key (currently exposed; removed in step 4b)"),
-                    fieldWithPath("data.storageConfigurations[].secretKey").description("S3 secret key (currently exposed; removed in step 4b)"),
                     fieldWithPath("data.storageConfigurations[].endPoint").description("S3 endpoint URL"),
                     fieldWithPath("data.storageConfigurations[].region").description("S3 region"),
                     fieldWithPath("data.storageConfigurations[].bucket").description("S3 bucket name"),
@@ -160,6 +161,60 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
         verify(myConfigService).setConfiguration(saved.capture());
         assertEquals("/new/bags", saved.getValue().getBagPath());
         assertEquals("http://docker:2375", saved.getValue().getDockerHost());
+    }
+
+    @Test
+    public void setConfigKeepsBlankSecrets() throws Exception {
+        doReturn(configWithSecrets()).when(myConfigService).getConfiguration();
+        doNothing().when(myConfigService).setConfiguration(any());
+
+        mockMvc.perform(post("/config/get")
+            .param("bagPath", "/bags")
+            .param("jdbcPassword", "")
+            .param("googleApiKey", "")
+            .param("bingKey", "")
+            .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        ArgumentCaptor<Configuration> saved = ArgumentCaptor.forClass(Configuration.class);
+        verify(myConfigService).setConfiguration(saved.capture());
+        assertEquals("jdbcSecret", saved.getValue().getJdbcPassword());
+        assertEquals("googleSecret", saved.getValue().getGoogleApiKey());
+        assertEquals("bingSecret", saved.getValue().getBingKey());
+        assertEquals("adminSecret", saved.getValue().getAdminPassword());
+        assertEquals("ldapSecret", saved.getValue().getLdapBindPassword());
+    }
+
+    @Test
+    public void setConfigReplacesNonBlankSecrets() throws Exception {
+        doReturn(configWithSecrets()).when(myConfigService).getConfiguration();
+        doNothing().when(myConfigService).setConfiguration(any());
+
+        mockMvc.perform(post("/config/get")
+            .param("bagPath", "/bags")
+            .param("jdbcPassword", "newJdbc")
+            .param("googleApiKey", "newGoogle")
+            .param("bingKey", "newBing")
+            .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        ArgumentCaptor<Configuration> saved = ArgumentCaptor.forClass(Configuration.class);
+        verify(myConfigService).setConfiguration(saved.capture());
+        assertEquals("newJdbc", saved.getValue().getJdbcPassword());
+        assertEquals("newGoogle", saved.getValue().getGoogleApiKey());
+        assertEquals("newBing", saved.getValue().getBingKey());
+    }
+
+    private static Configuration configWithSecrets() {
+        Configuration config = new Configuration();
+        config.setJdbcPassword("jdbcSecret");
+        config.setGoogleApiKey("googleSecret");
+        config.setBingKey("bingSecret");
+        config.setAdminPassword("adminSecret");
+        config.setLdapBindPassword("ldapSecret");
+        return config;
     }
 
     @Test

@@ -45,7 +45,7 @@ These steps come first because the plan cannot be validated without tests, and b
 
 - [ ] **4. Close the critical security holes. Each item is a separate PR.**
   - [x] 4a. Enable method security (`@EnableGlobalMethodSecurity(securedEnabled = true)`). Require `ROLE_ADMIN` on `scripts/save|run|delete`, and authentication on `bags/update|upload|setTag|setTagForBags|removeTags`.
-  - [ ] 4b. Stop serializing secrets: `jdbcPassword`, `adminPassword`, `ldapBindPassword`, API keys.
+  - [x] 4b. Stop serializing secrets: `jdbcPassword`, `adminPassword`, `ldapBindPassword`, API keys.
     - `config/get` returns a DTO without them.
     - Saving keeps the existing value when the field is empty.
     - `account/current` returns a DTO, not the `Account` entity.

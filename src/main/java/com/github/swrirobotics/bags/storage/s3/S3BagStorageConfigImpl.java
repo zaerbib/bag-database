@@ -30,10 +30,14 @@
 
 package com.github.swrirobotics.bags.storage.s3;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.github.swrirobotics.bags.storage.BagStorageConfiguration;
 
 public class S3BagStorageConfigImpl extends BagStorageConfiguration {
+    // Credentials are read from settings.yml (YamlBeans) but never sent to clients.
+    @JsonIgnore
     public String accessKey;
+    @JsonIgnore
     public String secretKey;
     public String endPoint;
     public String region;

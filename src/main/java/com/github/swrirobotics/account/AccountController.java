@@ -56,8 +56,8 @@ class AccountController {
     @RequestMapping(value = "account/current", method = RequestMethod.GET)
     @ResponseStatus(value = HttpStatus.OK)
     @ResponseBody
-    public Account accounts(Principal principal) {
+    public AccountDto accounts(Principal principal) {
         Assert.notNull(principal, "Account principal was null.");
-        return accountRepository.findByEmail(principal.getName());
+        return AccountDto.from(accountRepository.findByEmail(principal.getName()));
     }
 }

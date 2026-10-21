@@ -73,4 +73,15 @@ public class AccountControllerTest extends WebAppConfigurationAware {
                 )
             ));
     }
+
+    @Test
+    @WithMockUser(username = "missing@example.com")
+    public void currentAccountNotFound() throws Exception {
+        when(myAccountRepository.findByEmail("missing@example.com")).thenReturn(null);
+
+        mockMvc.perform(get("/account/current")
+            .principal(new UsernamePasswordAuthenticationToken("missing@example.com", null)))
+            .andExpect(status().isOk())
+            .andExpect(content().string(""));
+    }
 }
