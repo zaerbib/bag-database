@@ -37,29 +37,39 @@ import com.github.swrirobotics.bags.storage.BagStorage;
 import com.github.swrirobotics.bags.storage.BagWrapper;
 import com.github.swrirobotics.config.WebAppConfigurationAware;
 import com.github.swrirobotics.persistence.Bag;
+import com.github.swrirobotics.persistence.BagCount;
 import com.github.swrirobotics.persistence.MessageType;
 import com.github.swrirobotics.persistence.Tag;
 import com.github.swrirobotics.persistence.Topic;
 import com.github.swrirobotics.support.web.BagList;
+import com.github.swrirobotics.support.web.BagTreeNode;
 import com.github.swrirobotics.support.web.ExtJsFilter;
 import org.assertj.core.util.Lists;
 import org.junit.Test;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.restdocs.payload.FieldDescriptor;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -71,6 +81,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WithMockUser
 public class BagControllerTest extends WebAppConfigurationAware {
     @MockBean
     private BagService bagService;
@@ -558,5 +569,112 @@ public class BagControllerTest extends WebAppConfigurationAware {
                 fieldWithPath("[]").description("A list of (longitude, latitude) coordinates from each bag file.")
             ).andWithPrefix("[].", getGpsCoordinateFields())
         ));
+    }
+
+    @Test
+    public void getPaths() throws Exception {
+        when(bagService.getPaths()).thenReturn(Lists.newArrayList("/bags/a/", "/bags/b/"));
+        mockMvc.perform(get("/bags/paths"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.totalCount").value(2))
+            .andExpect(jsonPath("$.paths[0].path").value("/bags/a/"))
+            .andExpect(jsonPath("$.paths[1].path").value("/bags/b/"))
+        .andDo(document("bags/{method-name}",
+            preprocessResponse(prettyPrint()),
+            responseFields(
+                fieldWithPath("totalCount").description("Number of distinct paths"),
+                fieldWithPath("paths").description("Every distinct directory that contains bag files"),
+                fieldWithPath("paths[].path").description("A directory that contains bag files")
+            )
+        ));
+    }
+
+    @Test
+    public void getTreeNode() throws Exception {
+        BagTreeNode folder = new BagTreeNode();
+        folder.id = "/bags/a/";
+        folder.parentId = "/bags/";
+        folder.filename = "a";
+        folder.bagCount = 3L;
+        folder.storageId = "default";
+        BagTreeNode leaf = new BagTreeNode();
+        leaf.id = "/bags/test.bag";
+        leaf.parentId = "/bags/";
+        leaf.filename = "test.bag";
+        leaf.leaf = true;
+        leaf.bag = makeTestBag();
+        leaf.storageId = "default";
+        when(bagService.getTreePath("/bags/")).thenReturn(Lists.newArrayList(folder, leaf));
+        mockMvc.perform(get("/bags/treenode")
+            .param("node", "/bags/"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].id").value("/bags/a/"))
+            .andExpect(jsonPath("$[0].bagCount").value(3))
+            .andExpect(jsonPath("$[0].leaf").value(false))
+            .andExpect(jsonPath("$[0].bag").isEmpty())
+            .andExpect(jsonPath("$[1].leaf").value(true))
+            .andExpect(jsonPath("$[1].bag.filename").value("test.bag"))
+        .andDo(document("bags/{method-name}",
+            preprocessResponse(prettyPrint()),
+            requestParameters(
+                parameterWithName("node").description("Path of the folder whose children should be listed")
+            ),
+            responseFields(
+                fieldWithPath("[]").description("Child folders and bags of the requested node"),
+                fieldWithPath("[].id").description("Path of the child node"),
+                fieldWithPath("[].parentId").description("Path of the parent node"),
+                fieldWithPath("[].bagCount").description("Number of bags under this node"),
+                fieldWithPath("[].filteredBagCount").description("Number of bags under this node matching the current filter"),
+                fieldWithPath("[].expanded").description("For internal use only; used by the Folder View"),
+                fieldWithPath("[].filename").description("Display name of the node"),
+                fieldWithPath("[].leaf").description("True if this node is a bag rather than a folder"),
+                subsectionWithPath("[].bag").description("The bag (same shape as bags/get), for leaf nodes; null for folders").type(JsonFieldType.VARIES).optional(),
+                fieldWithPath("[].storageId").description("ID of the storage backend that hosts the node")
+            )
+        ));
+    }
+
+    @Test
+    public void checkFilteredBagCounts() throws Exception {
+        BagCount count = new BagCount();
+        count.path = "/bags/a/";
+        count.count = 2L;
+        when(bagService.checkFilteredBagCounts("vehicle")).thenReturn(new BagCount[]{count});
+        mockMvc.perform(get("/bags/filteredcount")
+            .param("text", "vehicle"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].path").value("/bags/a/"))
+            .andExpect(jsonPath("$[0].count").value(2))
+        .andDo(document("bags/{method-name}",
+            preprocessResponse(prettyPrint()),
+            requestParameters(
+                parameterWithName("text").description("Text to filter bags on")
+            ),
+            responseFields(
+                fieldWithPath("[]").description("Number of matching bags per folder"),
+                fieldWithPath("[].path").description("Folder path"),
+                fieldWithPath("[].count").description("Number of bags in the folder matching the filter")
+            )
+        ));
+    }
+
+    @Test
+    public void getVideo() throws Exception {
+        MvcResult result = mockMvc.perform(get("/bags/video")
+            .param("bagId", "1")
+            .param("topic", "/camera")
+            .param("frameSkip", "2"))
+            .andExpect(request().asyncStarted())
+            .andReturn();
+        mockMvc.perform(asyncDispatch(result))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("video/webm;codecs=\"vp8\""));
+
+        verify(bagService).writeVideoStream(eq(1L), eq("/camera"), eq(2L), any(OutputStream.class));
     }
 }

@@ -38,7 +38,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - *Test:* CI publishes `target/site/jacoco`.
   - *Rollback:* remove the plugin.
 
-- [ ] **3. API contract (characterization) tests.**
+- [x] **3. API contract (characterization) tests.**
   - For every endpoint called by the front end (`bags/*`, `scripts/*`, `status/*`, `admin/*`, `config/get`, `account/current`), add MockMvc tests that pin the JSON shape: `success`, `data`, `totalCount`, field names.
   - *Test:* the tests themselves; they become the regression baseline for all later steps.
   - *Rollback:* not needed (tests only).
