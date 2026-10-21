@@ -44,12 +44,13 @@ These steps come first because the plan cannot be validated without tests, and b
   - *Rollback:* not needed (tests only).
 
 - [ ] **4. Close the critical security holes. Each item is a separate PR.**
-  - [ ] 4a. Enable method security (`@EnableGlobalMethodSecurity(securedEnabled = true)`). Require `ROLE_ADMIN` on `scripts/save|run|delete`, and authentication on `bags/update|upload|setTag|setTagForBags|removeTags`.
+  - [x] 4a. Enable method security (`@EnableGlobalMethodSecurity(securedEnabled = true)`). Require `ROLE_ADMIN` on `scripts/save|run|delete`, and authentication on `bags/update|upload|setTag|setTagForBags|removeTags`.
   - [ ] 4b. Stop serializing secrets: `jdbcPassword`, `adminPassword`, `ldapBindPassword`, API keys.
     - `config/get` returns a DTO without them.
     - Saving keeps the existing value when the field is empty.
     - `account/current` returns a DTO, not the `Account` entity.
   - [ ] 4c. Upload path validation: resolve against `basePath`, reject if the result does not `startsWith(basePath)`, and sanitize `getOriginalFilename()`.
+    - Also add a URL-level `authenticated()` rule for `POST /bags/upload` (and the other write endpoints) before the `/bags/**` `permitAll`: the method-level check from 4a only runs after the multipart body has been fully received.
   - [ ] 4d. Allow-list the field names accepted by search and `ExtJsFilter` before calling `root.get(field)`.
   - *Test:* `WebSecurityConfigurationAware` tests that check anonymous → 401/403 and admin → 200, plus a traversal test with `../../etc`.
   - *Rollback:* revert the individual PR.

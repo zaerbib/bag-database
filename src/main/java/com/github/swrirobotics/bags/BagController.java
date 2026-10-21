@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.*;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -203,6 +204,7 @@ public class BagController {
         return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    @Secured("IS_AUTHENTICATED_FULLY")
     @RequestMapping(value = "/update",
         method = RequestMethod.POST)
     public BagUpdateStatus updateBags(@RequestBody String req) {
@@ -229,6 +231,7 @@ public class BagController {
         return status;
     }
 
+    @Secured("IS_AUTHENTICATED_FULLY")
     @RequestMapping(value = "/upload",
             method = RequestMethod.POST,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -384,6 +387,7 @@ public class BagController {
      * @param bagId The ID of the bag to set the tag for.
      * @throws NonexistentBagException If the specified bag doesn't exist.
      */
+    @Secured("IS_AUTHENTICATED_FULLY")
     @RequestMapping(value = "/setTag", method = RequestMethod.POST)
     public void setTagForBag(@RequestParam String tagName,
                              @RequestParam(required = false) String value,
@@ -393,6 +397,7 @@ public class BagController {
         myLogger.info("Set tag.");
     }
 
+    @Secured("IS_AUTHENTICATED_FULLY")
     @RequestMapping(value = "/setTagForBags", method = RequestMethod.POST)
     public void setTagForBags(@RequestParam String tagName,
                               @RequestParam(required = false) String value,
@@ -411,6 +416,7 @@ public class BagController {
      * @param bagId The ID of the bag to remove the tags from.
      * @throws NonexistentBagException If the specified bag doesn't exist.
      */
+    @Secured("IS_AUTHENTICATED_FULLY")
     @RequestMapping(value = "/removeTags", method = RequestMethod.POST)
     public void removeTagsForBag(@RequestParam String[] tagNames,
                                  @RequestParam Long bagId) throws NonexistentBagException {

@@ -40,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.ldap.core.support.LdapContextSource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -58,12 +59,19 @@ import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.MissingCsrfTokenException;
+import org.springframework.security.web.util.matcher.RequestHeaderRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 @EnableWebSecurity
@@ -164,7 +172,9 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                     .and()
                         .logout()
                             .logoutUrl("/logout").permitAll()
-                            .logoutSuccessUrl("/ldap_login?logout");
+                            .logoutSuccessUrl("/ldap_login?logout")
+                    .and()
+                        .exceptionHandling().authenticationEntryPoint(authenticationEntryPoint("/ldap_login"));
         }
         else {
             // If we're not using LDAP, the only user role is the administrator; unauthenticated
@@ -186,8 +196,23 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                         .logout()
                             .logoutUrl("/logout")
                             .permitAll()
-                            .logoutSuccessUrl("/signin?logout");
+                            .logoutSuccessUrl("/signin?logout")
+                    .and()
+                        .exceptionHandling().authenticationEntryPoint(authenticationEntryPoint("/signin"));
         }
+    }
+
+    /**
+     * Redirects unauthenticated requests to the login page, except ExtJS AJAX calls, which get a 401;
+     * otherwise they would follow the redirect and treat the HTML login page as a successful response.
+     */
+    private AuthenticationEntryPoint authenticationEntryPoint(String loginPage) {
+        LinkedHashMap<RequestMatcher, AuthenticationEntryPoint> entryPoints = new LinkedHashMap<>();
+        entryPoints.put(new RequestHeaderRequestMatcher("X-Requested-With", "XMLHttpRequest"),
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED));
+        DelegatingAuthenticationEntryPoint entryPoint = new DelegatingAuthenticationEntryPoint(entryPoints);
+        entryPoint.setDefaultEntryPoint(new LoginUrlAuthenticationEntryPoint(loginPage));
+        return entryPoint;
     }
 
     @Bean

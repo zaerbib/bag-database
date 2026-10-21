@@ -43,7 +43,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import java.security.Principal;
 
 @Controller
-@Secured("ROLE_USER")
+@Secured("IS_AUTHENTICATED_FULLY")
 class AccountController {
 
     private final AccountRepository accountRepository;

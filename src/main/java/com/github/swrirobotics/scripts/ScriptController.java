@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -50,6 +51,7 @@ public class ScriptController {
 
     private final Logger myLogger = LoggerFactory.getLogger(ScriptController.class);
 
+    @Secured("ROLE_ADMIN")
     @RequestMapping(value = "/delete", method = RequestMethod.POST)
     public void deleteScript(Long scriptId) {
         myLogger.info("deleteScript: " + scriptId);
@@ -90,6 +92,7 @@ public class ScriptController {
         return response;
     }
 
+    @Secured("ROLE_ADMIN")
     @RequestMapping(value = "/run", method = RequestMethod.POST)
     public ScriptRunResult runScript(@RequestParam Long scriptId,
                                      @RequestParam Long[] bagIds) {
@@ -106,6 +109,7 @@ public class ScriptController {
         return result;
     }
 
+    @Secured("ROLE_ADMIN")
     @PostMapping(value = "/save", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> saveScript(@RequestBody ScriptDTO scriptdto) {

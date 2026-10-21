@@ -23,6 +23,10 @@ Bag Database is starting up.
 
 Enter that password here to log in, and then you will have access to the administration panels.
 
+Only `ROLE_ADMIN` accounts can use the administration and configuration panels and save, run
+or delete scripts.  This includes LDAP mode: LDAP users who are not granted `ROLE_ADMIN` can
+still edit and tag bags, but must use the built-in `admin` account for these functions.
+
 ## Bag Database Administration
 
 Each of these buttons can be used to force the bag database to perform certain actions.

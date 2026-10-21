@@ -17,6 +17,10 @@ everything.
 Despite that, there is still some potentially dangerous functionality that is locked behind
 an administrative login.  Read [Administration](administration) for more information about that.
 
+Anonymous users can search, view and download bags, but modifying them requires a login:
+editing bag metadata, setting or removing tags, and uploading bags.  Saving, running and
+deleting [scripts](scripts) requires the `ROLE_ADMIN` role.
+
 If LDAP authentication *is* enabled, then all users will be required to go through a login
 page before they can access it.
 
