@@ -1,6 +1,6 @@
 ---
 name: version-upgrade
-description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5 and 17-27. Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
+description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5, 17-27, E3 (Docker runtime moves to embedded Tomcat) and E4 (Boot auto-configuration). Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
 ---
 
 # One-at-a-time version upgrade
@@ -17,7 +17,9 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
   - `<hibernate.version>`, currently 5.4.24.Final, also used by the `hibernate-jpamodelgen` annotation processor;
   - `maven-compiler-plugin` `<source>`/`<target>`, currently 11;
   - per-dependency `<version>` pins.
-- `docker/build/Dockerfile`: the Maven build image and the `tomcat:9-jdk11` runtime image.
+- `docker/build/Dockerfile`: the Maven build image and the runtime image.
+  - Until plan step E3, the runtime image is `tomcat:9-jdk11`, with the WAR deployed as `ROOT.war`.
+  - From E3 on, it is `eclipse-temurin:<jdk>-jre`, running `java -jar`. Tomcat is embedded, and Spring Boot manages its version, so a Tomcat upgrade is a Spring Boot upgrade.
 - `.github/workflows/maven.yml`: `actions/checkout@v2`, `actions/setup-java@v1`, `java-version: 1.11`.
 - `src/main/webapp/resources/js/external`: vendored JS. It is loaded from `WEB-INF/views/fragments/header.html`; after step 13, from the static `index.html`.
 
@@ -31,7 +33,7 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
 4. **App-impact checklist.**
    - Copy the step's *App impact* bullets from the plan into your plan and the PR description, then resolve each one.
    - For OpenRewrite steps (20, 23), use the recipe the plan names. The OpenRewrite Maven plugin is not in the pom, so ask before adding it.
-   - Confirm that `WebAppInitializer` and the test `WebAppConfigurationAware` still list matching config classes (CLAUDE.md).
+   - Confirm that the production bootstrap and the test `WebAppConfigurationAware` still list matching config classes (CLAUDE.md). The bootstrap is `WebAppInitializer` before plan step E1, and `BagDatabaseApplication` after it.
 5. **Compile and diff.**
    - Run `mvn -B -DskipTests package` and fix compile errors.
    - Re-run `mvn dependency:tree`. Look for unexpected transitive changes and for mixed `javax.*` and `jakarta.*` artifacts.

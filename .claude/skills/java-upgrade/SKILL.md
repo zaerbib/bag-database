@@ -9,8 +9,10 @@ The JDK moves in **two hops, one PR each**, in the order set by `.claude/docs/re
 
 | Hop | Plan step | Runs on | Runtime image |
 |---|---|---|---|
-| 11 → 17 | **18** | Boot 2.6 / Spring 5.3 / Hibernate 5.4 (after Spring Session 2, step 17) | Tomcat 9 |
-| 17 → 21 | **25** | Boot 3.x / Spring 6 / Hibernate 6 (after steps 23–24) | Tomcat 10.1 |
+| 11 → 17 | **18** | Boot 2.6 / Spring 5.3 / Hibernate 5.4 (after Spring Session 2, step 17) | `eclipse-temurin:17-jre`, embedded Tomcat 9 |
+| 17 → 21 | **25** | Boot 3.x / Spring 6 / Hibernate 6 (after steps 23–24) | `eclipse-temurin:21-jre`, embedded Tomcat 10.1 |
+
+Both hops come after plan step E3, which moves the Docker image to a plain JRE running `java -jar` on Spring Boot's embedded Tomcat. A JDK hop therefore changes only the JRE. The Tomcat version comes from Spring Boot, so it never changes in these PRs.
 
 Never jump 11 → 21 directly. On Java 21, the Boot 2.6 / Hibernate 5.4 / byte-buddy 1.10 stack is not expected to work: those libraries predate Java 21 class files. Verify this yourself before relying on it.
 
@@ -21,7 +23,7 @@ This skill adds the JDK-specific checks. The generic upgrade procedure comes fro
 |---|---|---|---|
 | `pom.xml`, `maven-compiler-plugin` 3.10.1 (`<inherited>false</inherited>`) | `<source>11</source><target>11</target>` | `<release>17</release>` (replaces source/target) | `<release>21</release>` |
 | `docker/build/Dockerfile`, build stage | `maven:3.8.5-openjdk-11` | `maven:3.9-eclipse-temurin-17` | `maven:3.9-eclipse-temurin-21` |
-| `docker/build/Dockerfile`, runtime stage | `tomcat:9-jdk11` | `tomcat:9-jdk17-temurin` | `tomcat:10.1-jdk21-temurin` |
+| `docker/build/Dockerfile`, runtime stage | `eclipse-temurin:11-jre` (after E3; `tomcat:9-jdk11` before it) | `eclipse-temurin:17-jre` | `eclipse-temurin:21-jre` |
 | `.github/workflows/maven.yml` | `setup-java@v1`, `java-version: 1.11` | `setup-java@v4`, `distribution: temurin`, `java-version: 17` | `java-version: 21` |
 
 The image tags come from the plan. **Confirm each tag exists on Docker Hub** before committing.
@@ -38,6 +40,7 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
    - openpnp documents `loadShared()` as unsupported on Java 12+, with `loadLocally()` as the replacement. Confirm this against the library's README or source for the version in use.
    - If it is true, image endpoints for Bayer and other OpenCV-decoded formats degrade **silently**.
    - Check the startup log for `Unable to load OpenCV`.
+   - Since E1/E3, the library is loaded from a nested JAR inside the executable WAR (`WEB-INF/lib`). Check the container, not only `mvn test`, because the tests use an exploded classpath.
    - If it fails, switch to `nu.pattern.OpenCV.loadLocally()` in its own small commit, and add a test that asserts OpenCV loaded, e.g. `new org.opencv.core.Mat()` does not throw.
 2. **Bytecode libraries pinned too old.** These must support the target class-file version (61 for Java 17, 65 for Java 21):
    - `byte-buddy` is pinned at **1.10.10, compile scope** (pom ~line 325). Hibernate 5.4 proxies and Mockito 4.4 use it at runtime.
@@ -49,7 +52,9 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
 3. **Strong encapsulation.** `--illegal-access` was removed in 17, so reflective access to JDK internals now throws `InaccessibleObjectException`.
    - Candidates are older reflective libraries: yamlbeans 1.15 (`ConfigService` reading `settings.yml`), Hibernate 5.4, H2GIS 1.3 in tests, docker-java-api 0.0.13, and google-maps-services.
    - Do **not** add blanket `--add-opens`. Add one only for a stack trace you actually observed, and scope it to the module and package named in the error.
-   - Put it in the surefire `argLine` for tests, and in a `CATALINA_OPTS` / `setenv.sh` for Tomcat. No such file exists today: `src/main/docker/entrypoint.sh` sets no Java options. Add the file in this PR and document it.
+   - Put it in the surefire `argLine` for tests.
+   - For the container, put it in `JAVA_OPTS`, which `src/main/docker/entrypoint.sh` passes to `exec java $JAVA_OPTS -jar` since E3. Set the default with `ENV JAVA_OPTS` in the Dockerfile.
+   - For installations on an external Tomcat, document the same flag as `CATALINA_OPTS` in `setenv.sh`, in `docs/installation/tomcat.md`.
    - `ConfigService` is skipped under the `test` profile, so yamlbeans is **not exercised by tests**. Check it on a running container.
 4. **`javax.annotation.PostConstruct`** is used in `AdminController`, `BagScanner`, `ScriptService` and `StatusService`. It left the JDK in Java 11 and comes from a dependency.
    - Hop 18: nothing to change. Confirm it still resolves with `mvn dependency:tree -Dincludes=*:*annotation*`.
@@ -59,7 +64,7 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
 ## Procedure (each hop)
 1. **Run the version-upgrade baseline.** On a clean tree, run `mvn -B package`, and record the surefire test count and the `dependency:tree`. Tag `pre-18` or `pre-25` after the user confirms.
 2. **Check the prerequisites:**
-   - Hop 18: steps 5 and 17 are checked in the plan, and the `byte-buddy` pin is gone.
+   - Hop 18: steps 5, E3 and 17 are checked in the plan, and the `byte-buddy` pin is gone.
    - Hop 25: steps 23 and 24 are checked.
    - If any is missing, stop and tell the user.
 3. **Run the local JDK.** Both `java -version` and `mvn -v` must report the target JDK. If not, ask the user to install or select it; do not install it yourself.
@@ -79,7 +84,7 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
    - Check an image topic, especially a Bayer or OpenCV-decoded one.
    - Check video streaming (ffmpeg).
    - Check the WebSocket status bar.
-   - Scan the Tomcat log for `WARNING: Illegal reflective access` / `InaccessibleObjectException` / OpenCV warnings.
+   - Scan the application log (container stdout, which includes the embedded Tomcat) for `WARNING: Illegal reflective access` / `InaccessibleObjectException` / OpenCV warnings.
 8. **Hop 25 only, optional:** virtual threads (`spring.threads.virtual.enabled`, Boot ≥ 3.2) belong to plan step 34 (scanner executor) or a separate PR, **not this one**. The upgrade PR must not change behavior.
 9. **Record:**
    - Add `CHANGELOG.md` entries for the JDK, base images and CI.
@@ -94,4 +99,5 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
 ## Safety
 - No Docker builds or runs, image pulls, `git tag` or `git push` without user confirmation.
 - Never install or switch the system JDK yourself; ask the user.
-- Do not combine the JDK bump with Spring, Hibernate or Tomcat major upgrades. The exception is the Tomcat 10.1 runtime image at hop 25, because that runtime is already required by step 23.
+- Do not combine the JDK bump with Spring, Hibernate or Tomcat major upgrades. After E3, Tomcat is embedded and versioned by Spring Boot, so the runtime image change in a hop is only the JRE (`eclipse-temurin:NN-jre`).
+- If E3 is not checked when hop 18 starts, stop and tell the user. Do not move to a `tomcat:*-jdk17` image as a workaround.
