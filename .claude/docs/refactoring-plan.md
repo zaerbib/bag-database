@@ -118,6 +118,9 @@ Goal: the application starts with `java -jar bag-database.war` on Spring Boot's 
       - an anonymous `POST /bags/upload` is refused.
     - A filter-order assertion: session, then multipart, then security.
     - A Docker compose smoke test on the unchanged `tomcat:9` image proves the external-Tomcat mode still works.
+  - *Results (2026-10-22):*
+    - [x] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes.
+    - [ ] External-Tomcat smoke test on `tomcat:9`: declined, not run. Since E3 the Docker image no longer uses an external Tomcat, so this needs a WAR deployed to a standalone Tomcat 9.
   - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
 
 - [x] **E2. Tomcat settings as Spring Boot properties.**
@@ -157,6 +160,15 @@ Goal: the application starts with `java -jar bag-database.war` on Spring Boot's 
       - image and video endpoints work (OpenCV native loading from the executable WAR).
     - `docker stop` shuts down gracefully.
     - Compare the image size with the old one.
+  - *Results (2026-10-22, examples reproduced with `docker run` against the locally built image):*
+    - [x] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`.
+    - [x] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
+    - [x] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
+    - [ ] S3: not run. Its `settings.yml` (with credentials) must be written by hand, which the project's credential-file hook forbids.
+    - [ ] Webviz: not run. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
+    - [x] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
+    - [x] `docker stop`: graceful shutdown completed in 1 s.
+    - [x] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
   - *Rollback:* redeploy the `pre-E3` image; reverting the Dockerfile brings back `tomcat:9`.
 
 ---
