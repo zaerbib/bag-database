@@ -33,6 +33,7 @@ package com.github.swrirobotics.config;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
 import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -57,8 +58,10 @@ import org.springframework.context.annotation.Import;
          SecurityConfig.class,
          WebMvcConfig.class,
          WebServerConfig.class})
-// DispatcherServletAutoConfiguration is not needed: WebServerConfig registers the DispatcherServlet itself
+// DispatcherServletAutoConfiguration is not needed: WebServerConfig registers the DispatcherServlet itself.
+// EmbeddedWebServerFactoryCustomizerAutoConfiguration applies the server.tomcat.* properties.
 @ImportAutoConfiguration({ServletWebServerFactoryAutoConfiguration.class,
+                          EmbeddedWebServerFactoryCustomizerAutoConfiguration.class,
                           WebSocketServletAutoConfiguration.class})
 public class BagDatabaseApplication extends SpringBootServletInitializer {
     public static void main(String[] args) {

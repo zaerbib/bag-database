@@ -64,7 +64,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @RunWith(SpringRunner.class)
 @ActiveProfiles("test")
 @SpringBootTest(classes = {BagDatabaseApplication.class, EmbeddedDataSourceConfig.class},
-                webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+                webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+                properties = "server.tomcat.basedir=target/tomcat-server-test")
 public class EmbeddedServerTest {
     @Autowired
     private TestRestTemplate myRestTemplate;

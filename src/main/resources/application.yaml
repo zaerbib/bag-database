@@ -5,8 +5,40 @@ spring:
   profiles:
     # Production profile unless spring.profiles.active says otherwise (tests use "test")
     default: default
+  lifecycle:
+    # Graceful shutdown waits for open async video streams; stop waiting before docker stop's
+    # 10-second SIGKILL
+    timeout-per-shutdown-phase: 8s
 
+# Embedded Tomcat settings, carried over from src/main/docker/server.xml. An external Tomcat ignores them
+# and uses its own server.xml.
 server:
+  port: 8080
+  # Let in-flight requests finish on SIGTERM (docker stop), within spring.lifecycle below
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 2KB
+    mime-types: text/html, text/xml, text/plain, text/css, text/javascript, text/json,
+      application/x-javascript, application/javascript, application/json
+    excluded-user-agents: gozilla, traviata
+  tomcat:
+    # Like CATALINA_BASE: the access log goes to ./logs (next to bag_database.log) and Tomcat's work files
+    # (including multipart upload buffers) to ./work, instead of a new temporary directory on every start
+    basedir: .
+    connection-timeout: 20s
+    threads:
+      max: 150
+      min-spare: 25
+    # Read and discard the rest of a request body that was refused (e.g. an over-limit upload)
+    # instead of cutting the connection; uploads go up to 50 GB.
+    max-swallow-size: -1
+    accesslog:
+      enabled: true
+      directory: logs
+      prefix: localhost_access_log
+      suffix: .txt
+      pattern: '%h %l %u %t "%r" %s %b'
   servlet:
     # WebMvcConfig forwards unmapped requests to the container's "default" servlet, which an external
     # Tomcat always has but Boot's embedded Tomcat only registers when asked to

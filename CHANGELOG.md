@@ -11,6 +11,7 @@ Unreleased
   - When deployed to an external Tomcat, the general error page is now served by Spring Boot's `ErrorPageFilter` (a forward) instead of a `web.xml` error page (an error dispatch), so it renders without the user's session and security context.
   - Spring Boot now initializes logging and prints its banner, and reads its usual external configuration (`application.yaml` or `config/` in the working directory, environment variables, command-line arguments). Under `java -jar`, `bag_database.log` is written to `./logs` because `catalina.base` is not set.
   - `mvn tomcat7:run` is replaced by `mvn spring-boot:run`.
+- The embedded Tomcat uses the settings of the Docker image's `server.xml`, as `server.*` properties in `application.yaml`: port 8080, 150/25 threads, 20 s connection timeout, gzip compression above 2 KB, and the access log (`logs/localhost_access_log.*.txt` under the working directory, which is also Tomcat's base directory). Refused uploads are read to the end (`max-swallow-size: -1`), and shutdown is graceful for up to 8 seconds so that it completes within `docker stop`'s default 10 seconds. An external Tomcat keeps using its own `server.xml`.
 
 3.5.3
 - Updating Docker configuration to reference simplified paths (Thanks danthony06)
