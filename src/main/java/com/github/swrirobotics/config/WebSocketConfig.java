@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.config.SimpleBrokerRegistration;
 import org.springframework.scheduling.TaskScheduler;
@@ -51,20 +52,18 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 public class WebSocketConfig extends AbstractSessionWebSocketMessageBrokerConfigurer<ExpiringSession> {
     private final Logger myLogger = LoggerFactory.getLogger(WebSocketConfig.class);
 
+    // Lazy: the scheduler is created by the message broker configuration that this configurer feeds,
+    // and Spring Boot does not allow circular references.
     @Autowired
+    @Lazy
     private TaskScheduler myScheduler;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         myLogger.info("Configuring message broker.");
         SimpleBrokerRegistration broker = config.enableSimpleBroker("/topic");
-        if (myScheduler != null) {
-            myLogger.info("Enabling task scheduling.");
-            broker.setTaskScheduler(myScheduler);
-        }
-        else {
-            myLogger.warn("No task scheduler available.");
-        }
+        myLogger.info("Enabling task scheduling.");
+        broker.setTaskScheduler(myScheduler);
         config.setApplicationDestinationPrefixes("/app");
 
     }

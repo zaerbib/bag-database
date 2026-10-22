@@ -11,7 +11,8 @@
 	</appender>
 
 	<appender name="LOGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-		<file>${catalina.base}/logs/bag_database.log</file>
+		<!-- catalina.base is only set by an external Tomcat; with java -jar, log under the working directory -->
+		<file>${catalina.base:-.}/logs/bag_database.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>bag_database.%d{yyyy-MM-dd}.log.zip</fileNamePattern>
         </rollingPolicy>

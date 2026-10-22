@@ -1,0 +1,13 @@
+app:
+  version: "3.0"
+
+spring:
+  profiles:
+    # Production profile unless spring.profiles.active says otherwise (tests use "test")
+    default: default
+
+server:
+  servlet:
+    # WebMvcConfig forwards unmapped requests to the container's "default" servlet, which an external
+    # Tomcat always has but Boot's embedded Tomcat only registers when asked to
+    register-default-servlet: true

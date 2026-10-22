@@ -31,22 +31,12 @@
 package com.github.swrirobotics.config;
 
 import com.github.swrirobotics.support.web.Configuration;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.ContextHierarchy;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -59,66 +49,37 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 /**
- * Mirrors WebAppInitializer: a root context with every config class and a DispatcherServlet
- * child context with WebMvcConfig.  Requests are served by the child context's controllers,
- * so @Secured must be enforced there, not only in the single merged context the other tests use.
+ * @Secured is enforced on both controllers and services of the single application context.
  */
-@RunWith(SpringJUnit4ClassRunner.class)
-@ActiveProfiles("test")
-@WebAppConfiguration
-@ContextHierarchy({
-    @ContextConfiguration(name = "root", classes = {
-        ApplicationConfig.class,
-        EmbeddedDataSourceConfig.class,
-        JpaConfig.class,
-        LiquibaseConfig.class,
-        WebSocketConfig.class,
-        SecurityConfig.class,
-        WebMvcConfig.class
-    }),
-    @ContextConfiguration(name = "servlet", classes = WebMvcConfig.class)
-})
-public class MethodSecurityContextHierarchyTest {
-    @Inject
-    private WebApplicationContext myServletContext;
-    @Inject
-    private FilterChainProxy mySpringSecurityFilterChain;
+public class MethodSecurityTest extends WebSecurityConfigurationAware {
     @Inject
     private ConfigService myConfigService;
 
     @Rule
     public TemporaryFolder myTempFolder = new TemporaryFolder();
 
-    private MockMvc myMockMvc;
-
-    @Before
-    public void before() {
-        myMockMvc = webAppContextSetup(myServletContext).addFilters(mySpringSecurityFilterChain).build();
-    }
-
     @Test
-    public void servletContextControllersAreSecured() throws Exception {
-        myMockMvc.perform(post("/scripts/delete").param("scriptId", "1").with(anonymous()))
+    public void controllersAreSecured() throws Exception {
+        mockMvc.perform(post("/scripts/delete").param("scriptId", "1").with(anonymous()))
             .andExpect(redirectedUrlPattern("**/signin"));
-        myMockMvc.perform(post("/bags/setTag")
+        mockMvc.perform(post("/bags/setTag")
                 .param("tagName", "t").param("bagId", "1").with(anonymous()))
             .andExpect(redirectedUrlPattern("**/signin"));
-        myMockMvc.perform(post("/scripts/delete").param("scriptId", "1").with(user("user").roles("USER")))
+        mockMvc.perform(post("/scripts/delete").param("scriptId", "1").with(user("user").roles("USER")))
             .andExpect(status().isForbidden());
     }
 
     @Test
-    public void servletContextControllersAcceptAdmin() throws Exception {
-        myMockMvc.perform(post("/config/get").with(user("admin").roles("ADMIN")))
+    public void controllersAcceptAdmin() throws Exception {
+        mockMvc.perform(post("/config/get").with(user("admin").roles("ADMIN")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
-    public void rootContextServicesAreSecured() throws Exception {
+    public void servicesAreSecured() throws Exception {
         // Redirect the settings file so that a regression cannot overwrite the real
         // ~/.ros-bag-database/settings.yml before the assertion fails.
         Object target = AopTestUtils.getUltimateTargetObject(myConfigService);

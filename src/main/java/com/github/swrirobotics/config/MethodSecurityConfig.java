@@ -36,14 +36,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 /**
  * Enforces {@code @Secured} on controllers and services.
  *
- * Imported by {@link WebMvcConfig} rather than {@link SecurityConfig}: the controllers that
- * handle requests live in the DispatcherServlet's child context, and method security only
- * proxies beans of the context in which it is enabled.  WebMvcConfig is loaded in both the
- * root and the servlet contexts, so services and controllers are both covered.
- *
- * The servlet context gets its own, empty authentication manager from this annotation.  That is
- * harmless while requests arrive already authenticated, but do not enable alwaysReauthenticate
- * or run-as here without wiring it to SecurityConfig's providers.
+ * Controllers and services live in the single application context created by
+ * {@link BagDatabaseApplication}, so enabling method security once covers both.
  */
 @Configuration
 @EnableGlobalMethodSecurity(securedEnabled = true)

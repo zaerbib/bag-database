@@ -46,8 +46,10 @@ public class ApplicationConfig {
     public static final String SETTINGS_PATH = "file://${HOME}/.ros-bag-database/";
     public static final String SETTINGS_LOCATION = SETTINGS_PATH + "settings.yml";
 
+    // Not named "propertySourcesPlaceholderConfigurer": Spring Session 1.x's JdbcHttpSessionConfiguration
+    // declares a bean with that name, and Spring Boot does not allow bean definitions to be overridden.
     @Bean
-    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
+    public static PropertySourcesPlaceholderConfigurer applicationPlaceholderConfigurer() {
         return new PropertySourcesPlaceholderConfigurer();
     }
 }

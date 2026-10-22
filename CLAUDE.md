@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as a **WAR** and deployed into Tomcat. It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
+The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as an executable **WAR**: it runs with `java -jar` on an embedded Tomcat and still deploys to an external Tomcat (the Docker image uses `tomcat:9` until plan step E3). It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
 
 ## Commands
 
@@ -16,6 +16,8 @@ mvn test                               # run all tests
 mvn test -Dtest=BagServiceTest         # run a single test class
 mvn test -Dtest=BagServiceTest#method  # run a single test method
 mvn -DskipTests package                # build WAR without tests
+java -jar target/bag-database-<version>.war   # run on the embedded Tomcat (needs ~/.ros-bag-database/settings.yml and PostGIS)
+mvn spring-boot:run                    # same, from sources
 docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> tomcat:9-jdk11 (ROOT.war)
 ```
 
@@ -23,7 +25,7 @@ docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> 
 
 ## Architecture
 
-- **Configuration is Java-based, not auto-configured.** `config/WebAppInitializer` (a `AbstractAnnotationConfigDispatcherServletInitializer`) explicitly lists the root config classes: `ApplicationConfig`, `JpaConfig`, `LiquibaseConfig`, `WebSocketConfig`, `SecurityConfig`, `WebMvcConfig`. `BagApplication` is only a marker class for package scanning. Tests list the same classes in `WebAppConfigurationAware`'s `@ContextConfiguration`, so a new config class must be added in both places.
+- **Configuration is Java-based, not auto-configured.** `config/BagDatabaseApplication` is the single entry point for both `java -jar` (embedded Tomcat) and external-Tomcat deployment (`SpringBootServletInitializer`). It `@Import`s the config classes (`ApplicationConfig`, `JpaConfig`, `LiquibaseConfig`, `WebSocketConfig`, `SecurityConfig`, `WebMvcConfig`, `WebServerConfig`) into one context and only imports the auto-configurations needed to run the embedded server. A new config class goes in that `@Import`; tests pick it up through `WebAppConfigurationAware`, which loads `BagDatabaseApplication`. `WebServerConfig` registers the `DispatcherServlet`, the filters (encoding → session → multipart → security) and the error page. `BagApplication` is only a marker class for package scanning. Spring Boot rejects bean-definition overriding and circular references, unlike the old plain contexts.
 - **Runtime settings come from `~/.ros-bag-database/settings.yml`** (YamlBeans-serialized `support/web/Configuration`), read via `ConfigService`. In Docker, `src/main/docker/entrypoint.sh` generates this file from environment variables on first start — adding a new setting usually means touching `Configuration`, `entrypoint.sh`, and `docs/configuration/`.
 - **Spring profiles:** `default` for production (`ProductionDataSourceProperties`, `BagScanner` only exist here); `test` swaps in an embedded H2GIS datasource (`src/test/.../EmbeddedDataSourceConfig`) and `ConfigService` skips reading settings.yml.
 - **Storage abstraction (`bags/storage`):** `BagStorage` implementations (`filesystem/` with a recursive file watcher, `s3/`) are built from `storageConfigurations` in settings.yml (each `BagStorageConfiguration` names its impl class). Each backend has a `storageId`; changing it causes all bags in it to be re-indexed. Backends fire `BagStorageChangeEvent`s to `BagScanner`, which calls `BagService` to parse bags (via `bag-reader-java`) and persist them. `BagWrapper` abstracts file access per backend.

@@ -5,6 +5,12 @@ Unreleased
 - Fix startup failure without LDAP: since method security was enabled, the LDAP beans are created at startup and threw a NullPointerException on the empty LDAP settings written by the Docker entrypoint.
 - Fail fast on a non-PostgreSQL JDBC driver instead of silently falling back to an embedded H2 database. The Docker `DB_DRIVER`, `DB_URL` and `DB_USER` defaults are now `org.postgresql.Driver`, `jdbc:postgresql://postgres/bag_database` and `bag_database`; without a `settings.yml`, the built-in defaults are `org.postgresql.Driver`, `jdbc:postgresql://localhost/bag_database` and `bag_database`.
 - Dependency hygiene: remove `ldapsdk` 4.1, `javax.transaction:jta` 1.1, `tomcat-el-api`/`tomcat-embed-el` 8.5.15 and the unused `bootstrap.min.js`; drop the `byte-buddy` 1.10.10 and `objenesis` 3.2 pins and let Spring Boot manage `HikariCP` (3.4.5 → 4.0.3); `h2`, `h2gis-*` and `org.osgi.service.jdbc` are now test-scoped.
+- Executable WAR: `java -jar bag-database-<version>.war` starts the application on an embedded Tomcat 9; the same WAR still deploys to an external Tomcat. `BagDatabaseApplication` replaces `WebAppInitializer`, `SecurityInitializer`, `SpringSessionInitializer` and `web.xml`; `application.properties` becomes `application.yaml` (the unused `logging.level.org.springframework.security=DEBUG` line is dropped).
+  - Behavior change: the root and servlet application contexts are merged into one. Controllers, `@PostConstruct` hooks (e.g. `AdminController.checkAdminAccount`) and `@Scheduled` tasks (e.g. `ScriptService`'s result polling) now run once instead of twice.
+  - The character-encoding filter now runs first, on every URL, before the session, multipart and security filters.
+  - When deployed to an external Tomcat, the general error page is now served by Spring Boot's `ErrorPageFilter` (a forward) instead of a `web.xml` error page (an error dispatch), so it renders without the user's session and security context.
+  - Spring Boot now initializes logging and prints its banner, and reads its usual external configuration (`application.yaml` or `config/` in the working directory, environment variables, command-line arguments). Under `java -jar`, `bag_database.log` is written to `./logs` because `catalina.base` is not set.
+  - `mvn tomcat7:run` is replaced by `mvn spring-boot:run`.
 
 3.5.3
 - Updating Docker configuration to reference simplified paths (Thanks danthony06)

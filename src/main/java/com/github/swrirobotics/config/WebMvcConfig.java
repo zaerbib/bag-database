@@ -38,8 +38,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -59,7 +57,6 @@ import org.thymeleaf.templateresolver.ITemplateResolver;
 import static org.springframework.context.annotation.ComponentScan.Filter;
 
 @Configuration
-@PropertySource("classpath:application.properties")
 @ComponentScan(basePackageClasses = BagApplication.class,
                includeFilters = {@Filter(Controller.class)},
                useDefaultFilters = false)
@@ -96,11 +93,6 @@ class WebMvcConfig implements WebMvcConfigurer {
         // starve and then nobody will be able to run any streaming tasks until the older ones are done.
         // The current value is 1 hour, which should be more than long enough.
         configurer.setDefaultTimeout(3600000);
-    }
-
-    @Bean
-    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
-        return new PropertySourcesPlaceholderConfigurer();
     }
 
     @Bean(name = "messageSource")
