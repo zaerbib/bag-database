@@ -75,7 +75,7 @@ These steps come first because the plan cannot be validated without tests, and b
 - The Docker image is a plain JRE image (`eclipse-temurin`) running `java -jar`. Outside Docker, the only requirements are a JDK and PostGIS.
 - See [`audit.md` §8](audit.md#8-runtime-and-deployment).
 
-**Where we stand:** E1–E3 are done. They put the embedded Tomcat in place and moved the Docker image off `tomcat:9`, but as a transition they still build a WAR that can also be deployed into an external Tomcat. **E5 removes that external-Tomcat mode and E6 switches the packaging to a JAR. Phase 0b is complete only when both are done.**
+**Where we stand:** E1–E3 are implemented and committed, but not checked. They put the embedded Tomcat in place and moved the Docker image off `tomcat:9`, but as a transition they still build a WAR that can also be deployed into an external Tomcat. **E5 removes that external-Tomcat mode and E6 switches the packaging to a JAR. Phase 0b is complete only when both are done.**
 
 **Chosen approach: embedded Tomcat with the explicit configuration first, Boot auto-configuration later.**
 - **Embedded Tomcat now, Boot auto-configuration later (step E4).**
@@ -94,7 +94,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - E1 re-registers the security, session and multipart filters, so the access-control tests from step 4 (including 4c's upload rule) must already exist.
   - Step 5 removes the `tomcat-el` 8.5 pins, which would clash with the embedded Tomcat 9.
 
-- [x] **E1. One Spring Boot bootstrap, two launch modes.** *(Checked by decision on 2026-10-22. The second launch mode, deployment into an external Tomcat, was a transition only; E5 removes it.)*
+- [ ] **E1. One Spring Boot bootstrap, two launch modes.** *(The second launch mode, deployment into an external Tomcat, was a transition only; E5 removes it.)*
   - Add `BagDatabaseApplication`:
     - annotated `@SpringBootConfiguration`, with `@Import` of the six config classes;
     - `@ImportAutoConfiguration` limited to `ServletWebServerFactoryAutoConfiguration`, `DispatcherServletAutoConfiguration` and `WebSocketServletAutoConfiguration`;
@@ -125,11 +125,11 @@ These steps come first because the plan cannot be validated without tests, and b
     - A filter-order assertion: session, then multipart, then security.
     - A Docker compose smoke test on the unchanged `tomcat:9` image proves the external-Tomcat mode still works.
   - *Results (2026-10-22):*
-    - [x] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes.
-    - [x] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
+    - [ ] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes.
+    - [ ] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
   - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
 
-- [x] **E2. Tomcat settings as Spring Boot properties.**
+- [ ] **E2. Tomcat settings as Spring Boot properties.**
   - Move what `src/main/docker/server.xml` configures into `application.properties`:
     - `server.port=8080`;
     - `server.tomcat.threads.max=150`, `server.tomcat.threads.min-spare=25`;
@@ -147,7 +147,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - Manual run of `java -jar target/bag-database-<version>.war` against a local PostGIS.
   - *Rollback:* remove the properties. The embedded defaults apply again.
 
-- [x] **E3. The Docker image runs the embedded server.** *(Checked by decision on 2026-10-22 with two open items: the S3 and webviz smoke tests, see Results.)*
+- [ ] **E3. The Docker image runs the embedded server.** *(Open items: the S3 and webviz smoke tests, see Results.)*
   - Tag `pre-E3` first.
   - `docker/build/Dockerfile`:
     - the build stage becomes `maven:3.9-eclipse-temurin-11`;
@@ -167,14 +167,14 @@ These steps come first because the plan cannot be validated without tests, and b
     - `docker stop` shuts down gracefully.
     - Compare the image size with the old one.
   - *Results (2026-10-22, examples reproduced with `docker run` against the locally built image):*
-    - [x] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`.
-    - [x] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
-    - [x] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
+    - [ ] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`.
+    - [ ] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
+    - [ ] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
     - [ ] S3: not run. Its `settings.yml` (with credentials) must be written by hand, which the project's credential-file hook forbids.
     - [ ] Webviz: not run. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
-    - [x] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
-    - [x] `docker stop`: graceful shutdown completed in 1 s.
-    - [x] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
+    - [ ] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
+    - [ ] `docker stop`: graceful shutdown completed in 1 s.
+    - [ ] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
   - *Rollback:* redeploy the `pre-E3` image; reverting the Dockerfile brings back `tomcat:9`.
 
 - [ ] **E5. Remove external-Tomcat deployment: Spring Boot's embedded Tomcat is the only runtime.**
