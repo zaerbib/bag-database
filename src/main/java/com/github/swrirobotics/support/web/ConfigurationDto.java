@@ -37,8 +37,7 @@ import java.util.Map;
 
 /**
  * The configuration as sent to the web interface. It mirrors {@link Configuration}
- * without its secrets (JDBC, admin and LDAP bind passwords, Google and Bing keys);
- * S3 credentials inside storageConfigurations are hidden by their own class.
+ * without its secrets (JDBC, admin and LDAP bind passwords, Google and Bing keys).
  */
 public class ConfigurationDto {
     private final Configuration myConfig;

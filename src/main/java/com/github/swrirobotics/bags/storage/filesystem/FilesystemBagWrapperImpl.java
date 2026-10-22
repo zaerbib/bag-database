@@ -60,7 +60,7 @@ public class FilesystemBagWrapperImpl implements BagWrapper {
         Pattern pathPattern = Pattern.compile("^(.*/)?(.*)$");
         Matcher keyMatcher = pathPattern.matcher(myAbsPath);
         if (!keyMatcher.find()) {
-            myLogger.error("Unable to parse S3 bag key.");
+            myLogger.error("Unable to parse bag path.");
         }
         myDirectory = keyMatcher.group(1);
         myFilename = keyMatcher.group(2);

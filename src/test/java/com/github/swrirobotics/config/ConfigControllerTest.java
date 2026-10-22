@@ -30,7 +30,7 @@
 
 package com.github.swrirobotics.config;
 
-import com.github.swrirobotics.bags.storage.s3.S3BagStorageConfigImpl;
+import com.github.swrirobotics.bags.storage.filesystem.FilesystemBagStorageConfigImpl;
 import com.github.swrirobotics.support.web.Configuration;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -40,6 +40,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 
 import java.io.IOException;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -104,25 +105,26 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
     }
 
     @Test
-    public void getConfigWithS3Storage() throws Exception {
-        S3BagStorageConfigImpl s3 = new S3BagStorageConfigImpl();
-        s3.storageId = "s3";
-        s3.dockerPath = "/s3bags";
-        s3.accessKey = "AKIAEXAMPLE";
-        s3.secretKey = "secretExample";
-        s3.endPoint = "https://s3.example.com";
-        s3.region = "us-east-1";
-        s3.bucket = "bags";
+    public void getConfigWithFilesystemStorage() throws Exception {
+        FilesystemBagStorageConfigImpl fs = new FilesystemBagStorageConfigImpl();
+        fs.storageId = "local2";
+        fs.dockerPath = "/bags2";
+        fs.basePath = "/data/bags2";
+        fs.isLocal = true;
         Configuration config = new Configuration();
-        config.getStorageConfigurations().add(s3);
+        config.getStorageConfigurations().add(fs);
         doReturn(config).when(myConfigService).getConfiguration();
 
         mockMvc.perform(post("/config/get").with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.storageConfigurations[0].bucket").value("bags"))
-            .andExpect(jsonPath("$.data.storageConfigurations[0].accessKey").doesNotExist())
-            .andExpect(jsonPath("$.data.storageConfigurations[0].secretKey").doesNotExist())
+            .andExpect(jsonPath("$.data.storageConfigurations.length()").value(1))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].keys()",
+                                containsInAnyOrder("storageId", "isLocal", "dockerPath", "basePath")))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].storageId").value("local2"))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].isLocal").value(true))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].dockerPath").value("/bags2"))
+            .andExpect(jsonPath("$.data.storageConfigurations[0].basePath").value("/data/bags2"))
             .andDo(document("config/{method-name}",
                 preprocessResponse(prettyPrint()),
                 relaxedResponseFields(
@@ -130,10 +132,7 @@ public class ConfigControllerTest extends WebAppConfigurationAware {
                     fieldWithPath("data.storageConfigurations[].storageId").description("ID of the storage backend"),
                     fieldWithPath("data.storageConfigurations[].isLocal").description("Whether the backend is local"),
                     fieldWithPath("data.storageConfigurations[].dockerPath").description("Path to bags inside script containers"),
-                    fieldWithPath("data.storageConfigurations[].endPoint").description("S3 endpoint URL"),
-                    fieldWithPath("data.storageConfigurations[].region").description("S3 region"),
-                    fieldWithPath("data.storageConfigurations[].bucket").description("S3 bucket name"),
-                    fieldWithPath("data.storageConfigurations[].updateIntervalMs").description("How often the bucket is polled for changes")
+                    fieldWithPath("data.storageConfigurations[].basePath").description("Directory indexed by this backend")
                 )
             ));
     }

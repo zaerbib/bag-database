@@ -173,7 +173,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - [x] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`. Re-run on the Phase 0b run with a fresh build of the same code.
     - [x] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
     - [x] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
-    - [x] S3: dropped from the test by decision. S3 storage is not used for now and is removed from the code base after E3.
+    - [x] S3: dropped from the test by decision. S3 storage is not used for now and was removed from the code base in a separate commit after E3.
     - [ ] Webviz: not run, accepted by decision. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
     - [ ] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
     - [x] `docker stop`: graceful shutdown completed in 1 s.
@@ -368,12 +368,12 @@ Each step bumps **one** thing. Each step runs the full suite, the contract tests
   - *Rollback:* switch the setting back.
 
 - [ ] **22. Minor upgrades of isolated libraries (one PR each):**
-  - [ ] AWS SDK 2.17 → latest 2.x
+  - [x] AWS SDK 2.17 → latest 2.x: no longer needed, the S3 storage backend and the AWS SDK were removed during Phase 0b.
   - [ ] OpenCV 4.5 → latest 4.x
   - [ ] `google-maps-services` latest
   - [ ] `yamlbeans` latest
   - [ ] `commons-*` latest
-  - *Test:* full suite; manual S3 smoke test with the S3 docker-compose example.
+  - *Test:* full suite.
   - *Rollback:* revert the single bump.
 
 - [ ] **23. Spring Boot 2.7 → 3.0 (Spring 6, Security 6, Hibernate 6.1, Jakarta EE 9).**

@@ -68,7 +68,7 @@ through the [Configuration](../web-interface/administration#bag-database-configu
 panel.  Note that if you are running inside a Docker container, they will be overwritten when the
 container restarts.
 
-Secrets (`jdbcPassword`, `adminPassword`, `ldapBindPassword`, `googleApiKey`, `bingKey`, and the
-`accessKey` / `secretKey` of S3 storage backends) are never sent to the web interface.  Their fields
+Secrets (`jdbcPassword`, `adminPassword`, `ldapBindPassword`, `googleApiKey` and `bingKey`) are
+never sent to the web interface.  Their fields
 in the Configuration panel are always shown empty; leaving one blank when saving keeps its current
 value.  To clear a secret, edit `settings.yml` directly.

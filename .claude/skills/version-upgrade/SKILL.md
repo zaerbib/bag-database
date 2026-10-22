@@ -42,7 +42,6 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
    - Contract tests: see the **characterization-tests** skill.
    - From step 16 on, the PostGIS Testcontainers profile.
    - Smoke test with the relevant `docker/*/docker-compose.yml`, **only with user approval** (Docker pulls and runs). Step-specific checks:
-     - S3 compose for the AWS bump;
      - image and video endpoints for JDK and OpenCV bumps;
      - LDAP (`test_ldap` profile) for security changes.
    - From step 12 on, the Playwright smoke test.
