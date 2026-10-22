@@ -150,7 +150,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - [x] `java -jar` against PostGIS: run through the image's entrypoint (`exec java -jar`, `settings.yml` generated from the environment) against a throwaway `postgis/postgis:11-2.5`, because a hand-written `settings.yml` is refused by the credential-file hook. Started in 52 s; `/`, `/resources/**`, `bags/search`, SockJS info and the WebSocket upgrade (101) answer; responses are gzip-encoded; access log written.
   - *Rollback:* remove the properties. The embedded defaults apply again.
 
-- [ ] **E3. The Docker image runs the embedded server.** *(Open items: the S3 and webviz smoke tests, see Results.)*
+- [x] **E3. The Docker image runs the embedded server.** *(Checked by decision: the webviz smoke test and the sample-bag checks were not run, see Results.)*
   - Tag `pre-E3` first.
   - `docker/build/Dockerfile`:
     - the build stage becomes `maven:3.9-eclipse-temurin-11`;
@@ -162,7 +162,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - Delete `src/main/docker/server.xml`.
   - Update every `docker/*/docker-compose.yml`, `docs/installation/docker/*` and the README. `docs/installation/tomcat.md` stays until E5 removes external-Tomcat deployment.
   - *Test:*
-    - A compose smoke test for each example (no auth, LDAP, S3, reverse proxy with a context path, webviz) checks that:
+    - A compose smoke test for each example (no auth, LDAP, reverse proxy with a context path, webviz) checks that:
       - the application starts and bags are listed;
       - upload works;
       - the status WebSocket connects;
@@ -170,14 +170,14 @@ These steps come first because the plan cannot be validated without tests, and b
     - `docker stop` shuts down gracefully.
     - Compare the image size with the old one.
   - *Results (2026-10-22, examples reproduced with `docker run` against the locally built image):*
-    - [ ] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`.
-    - [ ] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
-    - [ ] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
-    - [ ] S3: not run. Its `settings.yml` (with credentials) must be written by hand, which the project's credential-file hook forbids.
-    - [ ] Webviz: not run. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
+    - [x] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`. Re-run on the Phase 0b run with a fresh build of the same code.
+    - [x] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
+    - [x] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
+    - [x] S3: dropped from the test by decision. S3 storage is not used for now and is removed from the code base after E3.
+    - [ ] Webviz: not run, accepted by decision. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
     - [ ] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
-    - [ ] `docker stop`: graceful shutdown completed in 1 s.
-    - [ ] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
+    - [x] `docker stop`: graceful shutdown completed in 1 s.
+    - [x] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
   - *Rollback:* redeploy the `pre-E3` image; reverting the Dockerfile brings back `tomcat:9`.
 
 - [ ] **E5. Remove external-Tomcat deployment: Spring Boot's embedded Tomcat is the only runtime.**
