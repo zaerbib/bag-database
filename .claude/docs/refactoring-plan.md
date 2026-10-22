@@ -67,7 +67,7 @@ These steps come first because the plan cannot be validated without tests, and b
 
 ---
 
-## [ ] Phase 0b — Run on Spring Boot with embedded Tomcat (still on the current stack)
+## [x] Phase 0b — Run on Spring Boot with embedded Tomcat (still on the current stack)
 
 Goal: the application starts with `java -jar bag-database.war` on Spring Boot's embedded Tomcat, and the Docker image no longer needs a Tomcat installation. During the transition, the same WAR can still be deployed to an external Tomcat. See [`audit.md` §8](audit.md#8-runtime-and-deployment).
 
@@ -88,7 +88,7 @@ Goal: the application starts with `java -jar bag-database.war` on Spring Boot's 
   - E1 re-registers the security, session and multipart filters, so the access-control tests from step 4 (including 4c's upload rule) must already exist.
   - Step 5 removes the `tomcat-el` 8.5 pins, which would clash with the embedded Tomcat 9.
 
-- [ ] **E1. One Spring Boot bootstrap, two launch modes.**
+- [x] **E1. One Spring Boot bootstrap, two launch modes.** *(Checked by decision on 2026-10-22 with one open item: the external-Tomcat smoke test, see Results.)*
   - Add `BagDatabaseApplication`:
     - annotated `@SpringBootConfiguration`, with `@Import` of the six config classes;
     - `@ImportAutoConfiguration` limited to `ServletWebServerFactoryAutoConfiguration`, `DispatcherServletAutoConfiguration` and `WebSocketServletAutoConfiguration`;
@@ -141,7 +141,7 @@ Goal: the application starts with `java -jar bag-database.war` on Spring Boot's 
     - Manual run of `java -jar target/bag-database-<version>.war` against a local PostGIS.
   - *Rollback:* remove the properties. The embedded defaults apply again, and an external Tomcat is not affected.
 
-- [ ] **E3. The Docker image runs the embedded server.**
+- [x] **E3. The Docker image runs the embedded server.** *(Checked by decision on 2026-10-22 with two open items: the S3 and webviz smoke tests, see Results.)*
   - Tag `pre-E3` first.
   - `docker/build/Dockerfile`:
     - the build stage becomes `maven:3.9-eclipse-temurin-11`;
