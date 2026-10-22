@@ -40,10 +40,10 @@ see [Storage](../../configuration/storage.md) for an example.
 | `ADMIN_PASSWORD` | The default password for administrative access.  If this is not set, one will be randomly generated and printed to the log file on initial startup. | |
 | `BAGDB_PATH` | The subdirectory to serve the Bag DB from.  For example, if this is `bagdb`, you might access it from `http://localhost:8080/bagdb/`.  Leaving this empty (the default) will serve it from the root path. | |
 | `BING_KEY` | The API key to use when connecting to Bing Maps.  You can get an API Key through the [Bing Maps Portal](https://www.bingmapsportal.com/). | |
-| `DB_DRIVER` | The class name of the JDBC driver to use. | org.hsqldb.jdbcDriver |
+| `DB_DRIVER` | The class name of the JDBC driver to use. Only `org.postgresql.Driver` (PostGIS) is supported; the application refuses to start with any other driver. | org.postgresql.Driver |
 | `DB_PASS` | The password to use when connecting to the database. | |
-| `DB_URL` | The JDBC URL for connecting to the database. | jdbc:hsqldb:mem:testdb |
-| `DB_USER` | The username to use when connecting to the database. | sa |
+| `DB_URL` | The JDBC URL for connecting to the database. | jdbc:postgresql://postgres/bag_database |
+| `DB_USER` | The username to use when connecting to the database. | bag_database |
 | `DEBUG_JAVASCRIPT` | Set this to `true` to force the application to load non-minified versions of Javascript files. This will increase load times. | false |
 | `DOCKER_HOST` | The URL to use to connect to a Docker service.  This can be empty if you do not intend to run scripts on bag files. It must be able to mount volumes on the same paths that the Bag Database can access them. TCP URLs should begin with `http://`. | |
 | `GOOGLE_API_KEY` | A Google API key that has permission to use the Google Maps GeoCoding API; this is necessary in order to resolve place names for GPS coordinates.  You can get an API key in the [Google Maps Platform](https://developers.google.com/maps/documentation/geocoding/get-api-key) documentation. | |

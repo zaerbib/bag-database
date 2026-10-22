@@ -24,7 +24,7 @@
 
 ---
 
-## [ ] Phase 0 — Safety net (before touching structure)
+## [x] Phase 0 — Safety net (before touching structure)
 
 These steps come first because the plan cannot be validated without tests, and because the audit found exploitable issues that must not survive the refactoring.
 
@@ -57,7 +57,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - *Test:* `WebSecurityConfigurationAware` tests that check anonymous → 401/403 and admin → 200, plus a traversal test with `../../etc`.
   - *Rollback:* revert the individual PR.
 
-- [ ] **5. Dependency hygiene (no version jumps).**
+- [x] **5. Dependency hygiene (no version jumps).**
   - Remove `ldapsdk`, `javax.transaction:jta`, `tomcat-el-api` / `tomcat-embed-el` 8.5, and the forced versions of `byte-buddy`, `HikariCP` and `objenesis` (let Boot manage them).
   - Move `h2`, `h2gis-*` and `org.osgi.service.jdbc` to `test` scope.
     - Make `JpaConfig` fail fast instead of silently falling back to H2 in production.

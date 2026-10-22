@@ -4,10 +4,10 @@
 ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 BAGDB_PATH=${BAGDB_PATH:-}
 BING_KEY=${BING_KEY:-}
-DB_DRIVER=${DB_DRIVER:-org.hsqldb.jdbcDriver}
+DB_DRIVER=${DB_DRIVER:-org.postgresql.Driver}
 DB_PASS=${DB_PASS:-}
-DB_URL=${DB_URL:-jdbc:hsqldb:mem:testdb}
-DB_USER=${DB_USER:-sa}
+DB_URL=${DB_URL:-jdbc:postgresql://postgres/bag_database}
+DB_USER=${DB_USER:-bag_database}
 DEBUG_JAVASCRIPT=${DEBUG_JAVASCRIPT:-false}
 DOCKER_HOST=${DOCKER_HOST:-}
 FASTER_CODEC=${FASTER_CODEC:-false}

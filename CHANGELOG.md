@@ -2,6 +2,9 @@
 Unreleased
 - Enforce `@Secured` method security. Modifying bags (update, upload, set/remove tags) now requires a login; saving, running and deleting scripts, `/admin/**` and `/config/**` now require `ROLE_ADMIN` (also for LDAP users). Unauthenticated AJAX requests to protected endpoints get 401 instead of a redirect to the login page.
 - Stop sending secrets to the browser. `/config/get` no longer returns `jdbcPassword`, `adminPassword`, `ldapBindPassword`, `googleApiKey`, `bingKey` or S3 `accessKey`/`secretKey`; saving the configuration with any of these left blank keeps the current value. `/account/current` returns only `id`, `email` and `role`.
+- Fix startup failure without LDAP: since method security was enabled, the LDAP beans are created at startup and threw a NullPointerException on the empty LDAP settings written by the Docker entrypoint.
+- Fail fast on a non-PostgreSQL JDBC driver instead of silently falling back to an embedded H2 database. The Docker `DB_DRIVER`, `DB_URL` and `DB_USER` defaults are now `org.postgresql.Driver`, `jdbc:postgresql://postgres/bag_database` and `bag_database`; without a `settings.yml`, the built-in defaults are `org.postgresql.Driver`, `jdbc:postgresql://localhost/bag_database` and `bag_database`.
+- Dependency hygiene: remove `ldapsdk` 4.1, `javax.transaction:jta` 1.1, `tomcat-el-api`/`tomcat-embed-el` 8.5.15 and the unused `bootstrap.min.js`; drop the `byte-buddy` 1.10.10 and `objenesis` 3.2 pins and let Spring Boot manage `HikariCP` (3.4.5 → 4.0.3); `h2`, `h2gis-*` and `org.osgi.service.jdbc` are now test-scoped.
 
 3.5.3
 - Updating Docker configuration to reference simplified paths (Thanks danthony06)

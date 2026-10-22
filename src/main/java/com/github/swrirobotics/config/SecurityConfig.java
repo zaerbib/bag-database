@@ -33,6 +33,7 @@ package com.github.swrirobotics.config;
 import com.github.swrirobotics.account.UserService;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -240,7 +241,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String searchBase = "";
         if (config != null) {
-            searchBase = config.getLdapSearchBase();
+            searchBase = StringUtils.defaultString(config.getLdapSearchBase());
         }
         myLogger.info("LDAP search base: [" + searchBase + "]");
         return new DefaultLdapAuthoritiesPopulator(ldapContextSource(), searchBase);
@@ -252,7 +253,8 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String ldapProvider = "";
         if (config != null) {
-            ldapProvider = config.getLdapServer();
+            // Empty settings in settings.yml are read back as null
+            ldapProvider = StringUtils.defaultString(config.getLdapServer());
         }
         myLogger.info("LDAP provider:  [" + ldapProvider + "]");
 
@@ -262,7 +264,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         PasswordPolicyAwareContextSource contextSource = new PasswordPolicyAwareContextSource(ldapProvider);
         if (config != null) {
             String binddn = config.getLdapBindDn();
-            if (!binddn.isEmpty()) {
+            if (StringUtils.isNotEmpty(binddn)) {
                 contextSource.setUserDn(binddn);
                 contextSource.setPassword(myConfigService.getConfiguration().getLdapBindPassword());
             }
@@ -277,7 +279,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String userPattern = "";
         if (config != null) {
-            userPattern = config.getLdapUserPattern();
+            userPattern = StringUtils.defaultString(config.getLdapUserPattern());
         }
         myLogger.info("LDAP user pattern: [" + userPattern + "]");
         authenticator.setUserDnPatterns(new String[]{userPattern});
