@@ -442,11 +442,11 @@ public class BagControllerTest extends WebAppConfigurationAware {
                     "text search"),
                 parameterWithName("fields").description("List of fields to search for text.  Note that searching " +
                     "both messageType and topicName at the same time is complex and may be slow.  May include any of: " +
-                    "filename, description, tags, path, location, vehicle, messageType, topicName, tags").optional(),
+                    "filename, description, tags, path, location, vehicle, messageType, topicName").optional(),
                 parameterWithName("page").description("Page number of results to return; 1 is the first page"),
                 parameterWithName("limit").description("Maximum number of results per page"),
                 parameterWithName("sort").description("Column to sort the results on; must be one of: " +
-                    "id, path, filename, location, vehicle, description, latitudeDeg, longitudeDeg, missing, " +
+                    "id, storageId, path, filename, location, vehicle, description, latitudeDeg, longitudeDeg, missing, " +
                     "md5sum, duration, createdOn, updatedOn, startTime, endTime, size, messageCount"),
                 parameterWithName("dir").description("Direction to sort results; must be either ASC or DESC"),
                 parameterWithName("filter").description("A list of ExtJsFilter objects for columns that support " +

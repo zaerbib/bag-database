@@ -47,23 +47,33 @@ import com.github.swrirobotics.persistence.Topic;
 import com.github.swrirobotics.persistence.TopicRepository;
 import com.github.swrirobotics.support.web.BagList;
 import com.github.swrirobotics.support.web.Configuration;
+import com.github.swrirobotics.support.web.ExtJsFilter;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.sql.Timestamp;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 public class BagServiceTest extends WebAppConfigurationAware {
     @Autowired
@@ -251,5 +261,187 @@ public class BagServiceTest extends WebAppConfigurationAware {
         assertFoundOnce(bagId, "search", fields);
         assertFoundOnce(bareBagId, "leftjoin-probe", fields);
         assertNotFound(bagId, "leftjoin-probe", fields);
+    }
+
+    // Fixed instant so that the date filters can bracket it
+    private static final long PROBE_TIME = 1_000_000_000_000L;
+
+    private Long insertFilterProbeBag() {
+        Bag bag = insertBareBag("filterprobe.bag", "filterprobemd5sum");
+        bag.setStorageId("probestorage");
+        bag.setLocation("Probe Location");
+        bag.setVehicle("Probe Vehicle");
+        bag.setDescription("Probe Description");
+        bag.setDuration(12.5);
+        bag.setSize(7L);
+        bag.setMessageCount(42L);
+        bag.setCoordinate(myBagService.makePoint(29.5, -98.5));
+        bag.setCreatedOn(new Timestamp(PROBE_TIME));
+        bag.setUpdatedOn(new Timestamp(PROBE_TIME));
+        bag.setStartTime(new Timestamp(PROBE_TIME));
+        bag.setEndTime(new Timestamp(PROBE_TIME));
+        return myBagRepository.save(bag).getId();
+    }
+
+    private static ExtJsFilter filter(String property, String operator, String value) {
+        ExtJsFilter filter = new ExtJsFilter();
+        filter.setProperty(property);
+        filter.setOperator(operator);
+        filter.setValue(value);
+        return filter;
+    }
+
+    private List<Long> filterBagIds(ExtJsFilter... filters) {
+        BagList result = myBagService.findBagsContainingText("", null, filters, 1, 100, "ASC", "filename");
+        return result.getBags().stream().map(Bag::getId).collect(Collectors.toList());
+    }
+
+    private void assertFilterMatches(Long bagId, ExtJsFilter... filters) {
+        assertEquals(1, Collections.frequency(filterBagIds(filters), bagId));
+    }
+
+    @Test
+    @Transactional
+    public void testSearchAcceptsEveryUiTextField() {
+        Long bagId = insertFilterProbeBag();
+        addTag(myBagRepository.findById(bagId).orElseThrow(), "ProbeTagKey", "ProbeTagValue");
+
+        assertFoundOnce(bagId, "filterprobe", "filename");
+        assertFoundOnce(bagId, "probe description", "description");
+        assertFoundOnce(bagId, "probetagkey", "tags");
+        assertFoundOnce(bagId, "/search/", "path");
+        assertFoundOnce(bagId, "probe location", "location");
+        assertFoundOnce(bagId, "probe vehicle", "vehicle");
+        // No message types or topics on this bag; the fields must still be accepted
+        assertNotFound(bagId, "filterprobe", "messageType");
+        assertNotFound(bagId, "filterprobe", "topicName");
+    }
+
+    @Test
+    @Transactional
+    public void testBlankTextIgnoresFieldNames() {
+        Long bagId = insertFilterProbeBag();
+        // BagStore.js sends these defaults on the first load; "topic" is not a Bag attribute
+        BagList result = myBagService.findBagsContainingText("", new String[]{"messageType", "topic"},
+                                                             null, 1, 100, "ASC", "filename");
+        assertTrue(result.getBags().stream().anyMatch(b -> b.getId().equals(bagId)));
+    }
+
+    @Test
+    @Transactional
+    public void testFilterAcceptsEveryGridColumn() {
+        Long bagId = insertFilterProbeBag();
+        String before = String.valueOf(PROBE_TIME - 1);
+        String after = String.valueOf(PROBE_TIME + 1);
+
+        assertFilterMatches(bagId, filter("id", "eq", String.valueOf(bagId)));
+        assertFilterMatches(bagId, filter("storageId", "like", "PROBESTORAGE"));
+        assertFilterMatches(bagId, filter("path", "like", "/search/"));
+        assertFilterMatches(bagId, filter("filename", "like", "filterprobe"));
+        assertFilterMatches(bagId, filter("location", "like", "probe loc"));
+        assertFilterMatches(bagId, filter("vehicle", "like", "probe veh"));
+        assertFilterMatches(bagId, filter("description", "like", "probe desc"));
+        assertFilterMatches(bagId, filter("latitudeDeg", "gt", "29"), filter("latitudeDeg", "lt", "30"));
+        assertFilterMatches(bagId, filter("longitudeDeg", "gt", "-99"), filter("longitudeDeg", "lt", "-98"));
+        assertFilterMatches(bagId, filter("missing", "=", "false"));
+        assertFilterMatches(bagId, filter("md5sum", "like", "filterprobemd5"));
+        assertFilterMatches(bagId, filter("duration", "gt", "12"), filter("duration", "lt", "13"));
+        assertFilterMatches(bagId, filter("size", "eq", "7"));
+        assertFilterMatches(bagId, filter("messageCount", "eq", "42"));
+        for (String dateField : new String[]{"createdOn", "updatedOn", "startTime", "endTime"}) {
+            assertFilterMatches(bagId, filter(dateField, "gt", before), filter(dateField, "lt", after));
+            assertFilterMatches(bagId, filter(dateField, "eq", String.valueOf(PROBE_TIME)));
+        }
+
+        // The filters are applied, not just accepted
+        assertFalse(filterBagIds(filter("vehicle", "like", "no such vehicle")).contains(bagId));
+        assertFalse(filterBagIds(filter("size", "eq", "8")).contains(bagId));
+        assertFalse(filterBagIds(filter("latitudeDeg", "gt", "30")).contains(bagId));
+        assertFalse(filterBagIds(filter("missing", "=", "true")).contains(bagId));
+        assertFalse(filterBagIds(filter("startTime", "gt", after)).contains(bagId));
+    }
+
+    @Test
+    @Transactional
+    public void testSortAcceptsEveryGridColumn() {
+        Long bagId = insertFilterProbeBag();
+        String[] sortable = {"id", "storageId", "path", "filename", "location", "vehicle", "description",
+                             "latitudeDeg", "longitudeDeg", "missing", "md5sum", "duration", "createdOn",
+                             "updatedOn", "startTime", "endTime", "size", "messageCount"};
+        for (String sort : sortable) {
+            for (String dir : new String[]{"ASC", "DESC"}) {
+                BagList result = myBagService.findBagsContainingText("", null, null, 1, 100, dir, sort);
+                assertTrue(sort + " " + dir,
+                           result.getBags().stream().anyMatch(b -> b.getId().equals(bagId)));
+            }
+        }
+    }
+
+    private void assertRejected(String text, String[] fields, ExtJsFilter[] filters, String sort) {
+        try {
+            myBagService.findBagsContainingText(text, fields, filters, 1, 100, "ASC", sort);
+            fail("Expected IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            // Hibernate also throws IllegalArgumentException for unknown attributes;
+            // make sure the allow-list is what rejected it
+            assertTrue(e.getMessage(), e.getMessage().startsWith("Unsupported "));
+        }
+    }
+
+    @Test
+    @Transactional
+    public void testSearchEndpointRejectsUnknownFields() throws Exception {
+        insertFilterProbeBag();
+        String[][] badParams = {
+            {"fields", "../../etc"},
+            {"sort", "version"},
+            {"filter", "[{\"property\":\"tags.value\",\"operator\":\"like\",\"value\":\"x\"}]"}
+        };
+        for (String[] bad : badParams) {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("text", "probe");
+            params.put("fields", "filename");
+            params.put("page", "1");
+            params.put("limit", "100");
+            params.put("sort", "filename");
+            params.put("dir", "ASC");
+            params.put(bad[0], bad[1]);
+            MockHttpServletRequestBuilder request = get("/bags/search");
+            params.forEach(request::param);
+            mockMvc.perform(request)
+                .andExpect(view().name("error/general"))
+                .andExpect(model().attribute("errorMessage", containsString("Unsupported ")))
+                .andExpect(content().string(not(containsString("filterprobe.bag"))));
+        }
+    }
+
+    @Test
+    @Transactional
+    public void testSearchRejectsUnknownTextField() {
+        insertFilterProbeBag();
+        for (String field : new String[]{"version", "md5sum", "coordinate", "scriptResults", "tags.value", "../x"}) {
+            assertRejected("probe", new String[]{"filename", field}, null, "filename");
+        }
+    }
+
+    @Test
+    @Transactional
+    public void testFilterRejectsUnknownProperty() {
+        insertFilterProbeBag();
+        for (String property : new String[]{"version", "indexed", "coordinate", "scriptResults", "tags.value", null}) {
+            assertRejected("", null, new ExtJsFilter[]{filter(property, "like", "x")}, "filename");
+        }
+    }
+
+    @Test
+    @Transactional
+    public void testSortRejectsUnknownProperty() {
+        insertFilterProbeBag();
+        for (String sort : new String[]{"version", "tags", "tags.value", "scriptResults.id", "coordinate"}) {
+            assertRejected("", null, null, sort);
+            // Also on the Specification path
+            assertRejected("probe", new String[]{"filename"}, null, sort);
+        }
     }
 }

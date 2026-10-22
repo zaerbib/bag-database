@@ -38,7 +38,7 @@ comparing boolean values.
 depending on the column.
 
 |`+property+`
-|Column to perform the operation on; must be one of: id, path, filename,
+|Column to perform the operation on; must be one of: id, storageId, path, filename,
 location, vehicle, description, latitudeDeg, longitudeDeg, missing, md5sum,
 duration, createdOn, updatedOn, startTime, endTime, size, messageCount
 
