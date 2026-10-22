@@ -42,8 +42,15 @@ import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import org.springframework.security.access.ConfigAttribute;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.FilterInvocation;
+import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
+
+import java.util.Collection;
 import java.util.UUID;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -217,5 +224,35 @@ public class AccessControlTest extends WebSecurityConfigurationAware {
     @Test
     public void adminCanReadCurrentAccount() throws Exception {
         expectAll(ADMIN, status().isOk(), get("/account/current"));
+    }
+
+    // The @Secured checks only run once the request reaches the controller, i.e. after a
+    // multipart body has been fully received. Writes must also be refused by the URL rules
+    // of the filter chain, which MockMvc results alone cannot distinguish.
+    @Test
+    public void writesAreProtectedByUrlRules() {
+        // Spring MVC also routes the trailing-slash form to the same handler.
+        for (String path : new String[]{"/bags/update", "/bags/upload", "/bags/setTag",
+                                         "/bags/setTagForBags", "/bags/removeTags", "/bags/upload/"}) {
+            assertEquals(path, "[authenticated]", urlRuleFor(path));
+        }
+        for (String path : new String[]{"/scripts/save", "/scripts/run", "/scripts/delete", "/scripts/run/"}) {
+            assertEquals(path, "[hasRole('ROLE_ADMIN')]", urlRuleFor(path));
+        }
+        // Reads stay open to anonymous users in non-LDAP mode.
+        assertEquals("[permitAll]", urlRuleFor("/bags/search"));
+        assertEquals("[permitAll]", urlRuleFor("/scripts/list"));
+    }
+
+    private String urlRuleFor(String path) {
+        FilterSecurityInterceptor interceptor = wac.getBean(FilterChainProxy.class)
+            .getFilters(path).stream()
+            .filter(FilterSecurityInterceptor.class::isInstance)
+            .map(FilterSecurityInterceptor.class::cast)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No FilterSecurityInterceptor for " + path));
+        Collection<ConfigAttribute> attributes = interceptor.getSecurityMetadataSource()
+            .getAttributes(new FilterInvocation(path, "POST"));
+        return String.valueOf(attributes);
     }
 }

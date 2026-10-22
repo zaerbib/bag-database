@@ -406,7 +406,8 @@ public class S3BagStorageImpl extends StatusProvider implements BagStorage {
     @Override
     public void uploadBag(MultipartFile file, String targetDirectory) throws IOException {
         myLogger.info( myConfig.storageId + ": uploadBag");
-        String absolutePath = normalizePath(targetDirectory + "/" + file.getOriginalFilename());
+        String absolutePath = normalizePath(UploadPaths.relativeDirectory(targetDirectory) + "/" +
+                                            UploadPaths.sanitizeFilename(file.getOriginalFilename()));
 
         myLogger.info("Uploading object with key: " + absolutePath);
         var request = PutObjectRequest.builder()

@@ -51,7 +51,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - `config/get` returns a DTO without them.
     - Saving keeps the existing value when the field is empty.
     - `account/current` returns a DTO, not the `Account` entity.
-  - [ ] 4c. Upload path validation: resolve against `basePath`, reject if the result does not `startsWith(basePath)`, and sanitize `getOriginalFilename()`.
+  - [x] 4c. Upload path validation: resolve against `basePath`, reject if the result does not `startsWith(basePath)`, and sanitize `getOriginalFilename()`.
     - Also add a URL-level `authenticated()` rule for `POST /bags/upload` (and the other write endpoints) before the `/bags/**` `permitAll`: the method-level check from 4a only runs after the multipart body has been fully received.
   - [ ] 4d. Allow-list the field names accepted by search and `ExtJsFilter` before calling `root.get(field)`.
   - *Test:* `WebSecurityConfigurationAware` tests that check anonymous → 401/403 and admin → 200, plus a traversal test with `../../etc`.

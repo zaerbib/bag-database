@@ -152,7 +152,22 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                         .antMatchers(
                                 "/favicon.ico",
                                 "/generalError",
-                                "/resources/**").permitAll(); // List resources that any users can access no matter what
+                                "/resources/**").permitAll() // List resources that any users can access no matter what
+                        // Write endpoints are also checked by @Secured, but that only runs once the
+                        // request reaches the controller, i.e. after a multipart upload has been fully
+                        // received. These rules refuse them in the filter chain, before the body is read,
+                        // and must come before the /bags/** and /scripts/** permitAll below.
+                        // "/**" also covers the trailing-slash form, which Spring MVC still routes.
+                        .antMatchers(
+                                "/bags/update/**",
+                                "/bags/upload/**",
+                                "/bags/setTag/**",
+                                "/bags/setTagForBags/**",
+                                "/bags/removeTags/**").authenticated()
+                        .antMatchers(
+                                "/scripts/save/**",
+                                "/scripts/run/**",
+                                "/scripts/delete/**").hasRole("ADMIN");
 
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String ldapServer = null;
