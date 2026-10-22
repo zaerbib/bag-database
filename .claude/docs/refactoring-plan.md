@@ -129,7 +129,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - [x] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
   - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
 
-- [ ] **E2. Tomcat settings as Spring Boot properties.**
+- [x] **E2. Tomcat settings as Spring Boot properties.**
   - Move what `src/main/docker/server.xml` configures into `application.properties`:
     - `server.port=8080`;
     - `server.tomcat.threads.max=150`, `server.tomcat.threads.min-spare=25`;
@@ -145,6 +145,9 @@ These steps come first because the plan cannot be validated without tests, and b
       - the access log is written;
       - a multipart upload larger than Tomcat's 2 MB form limit succeeds.
     - Manual run of `java -jar target/bag-database-<version>.war` against a local PostGIS.
+  - *Results (2026-10-22, Phase 0b run):*
+    - [x] `EmbeddedServerSettingsTest` (gzip, access log, upload over 2 MB) passes, 5 tests.
+    - [x] `java -jar` against PostGIS: run through the image's entrypoint (`exec java -jar`, `settings.yml` generated from the environment) against a throwaway `postgis/postgis:11-2.5`, because a hand-written `settings.yml` is refused by the credential-file hook. Started in 52 s; `/`, `/resources/**`, `bags/search`, SockJS info and the WebSocket upgrade (101) answer; responses are gzip-encoded; access log written.
   - *Rollback:* remove the properties. The embedded defaults apply again.
 
 - [ ] **E3. The Docker image runs the embedded server.** *(Open items: the S3 and webviz smoke tests, see Results.)*
