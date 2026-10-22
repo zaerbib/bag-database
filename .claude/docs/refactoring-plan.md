@@ -94,7 +94,7 @@ These steps come first because the plan cannot be validated without tests, and b
   - E1 re-registers the security, session and multipart filters, so the access-control tests from step 4 (including 4c's upload rule) must already exist.
   - Step 5 removes the `tomcat-el` 8.5 pins, which would clash with the embedded Tomcat 9.
 
-- [ ] **E1. One Spring Boot bootstrap, two launch modes.** *(The second launch mode, deployment into an external Tomcat, was a transition only; E5 removes it.)*
+- [x] **E1. One Spring Boot bootstrap, two launch modes.** *(The second launch mode, deployment into an external Tomcat, was a transition only; E5 removes it.)*
   - Add `BagDatabaseApplication`:
     - annotated `@SpringBootConfiguration`, with `@Import` of the six config classes;
     - `@ImportAutoConfiguration` limited to `ServletWebServerFactoryAutoConfiguration`, `DispatcherServletAutoConfiguration` and `WebSocketServletAutoConfiguration`;
@@ -125,8 +125,8 @@ These steps come first because the plan cannot be validated without tests, and b
     - A filter-order assertion: session, then multipart, then security.
     - A Docker compose smoke test on the unchanged `tomcat:9` image proves the external-Tomcat mode still works.
   - *Results (2026-10-22):*
-    - [ ] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes.
-    - [ ] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
+    - [x] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes. Re-verified 2026-10-22 on the Phase 0b run: 123 tests, 0 failures (`EmbeddedServerTest` 8, `AccessControlTest` 13).
+    - [x] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
   - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
 
 - [ ] **E2. Tomcat settings as Spring Boot properties.**
