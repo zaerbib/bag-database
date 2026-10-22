@@ -1,6 +1,6 @@
 ---
 name: characterization-tests
-description: Pin existing API behavior with MockMvc contract tests before a change and prove it is unchanged after; also access-control (anonymous/user/admin, CSRF) tests. Use for refactoring-plan steps that mention "contract tests", "add the test before the change", security fixes, or "JSON unchanged" (steps 1, 3, 4a-d, 6, 9, 10, 13, 15, 29, 30, 32, 37). Not for performance measurements (performance-change) or schema migrations (liquibase-changeset).
+description: Pin existing API behavior with MockMvc contract tests before a change and prove it is unchanged after; also access-control (anonymous/user/admin, CSRF) tests. Use for refactoring-plan steps that mention "contract tests", "add the test before the change", security fixes, or "JSON unchanged" (steps 1, 3, 4a-d, E1, E2, E5, E6, 6, 9, 10, 13, 15, 29, 30, 32, 37). Not for performance measurements (performance-change) or schema migrations (liquibase-changeset).
 ---
 
 # Characterization / contract tests

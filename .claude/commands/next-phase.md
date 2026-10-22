@@ -9,7 +9,7 @@ Run a whole phase of `.claude/docs/refactoring-plan.md` in one go. The plan's gr
 - If `$ARGUMENTS` names a phase (`0b`, `1`, `2`, `3`), take that `## [ ] Phase …` section. Otherwise take the FIRST `## [ ] Phase` heading in document order.
 - If it is already `[x]`, say so and stop.
 - List its unchecked steps `- [ ] **…**` in **document order** (E-steps are placed by position, not by number; see the plan's "Step numbering" note). For steps with sub-boxes (4a–4d, 22, 26, E4), each unchecked sub-box is its own unit of work and its own commit.
-- Check the plan's **Dependency map**. If a step depends on an unchecked step outside this phase (e.g. Phase 3 SQL steps need 16, step 35 needs 21, step 27 needs 13 and E4), mark it **blocked** and leave it out of this run.
+- Check the plan's **Dependency map**. If a step depends on an unchecked step outside this phase (e.g. Phase 3 SQL steps need 16, step 35 needs 21, E4 needs 16, 17 and 19), mark it **blocked** and leave it out of this run.
 
 ## 2. Read the context
 - `.claude/docs/audit.md`: the sections the phase's steps refer to.
@@ -18,8 +18,9 @@ Run a whole phase of `.claude/docs/refactoring-plan.md` in one go. The plan's gr
   | Steps | Skills |
   |---|---|
   | 1–4, 29 | characterization-tests |
-  | 5, 17–27, E3, E4 | version-upgrade |
+  | 5, 17–26, E3, E4 | version-upgrade |
   | E1, E2 | characterization-tests (bootstrap and server settings, behavior unchanged) |
+  | E5, E6 | version-upgrade (scope/packaging change) + characterization-tests (same pages, resources and API) |
   | 18, 25 | + java-upgrade |
   | 6–15 | front-back-separation (if `.claude/skills/front-back-separation` does not exist, say so and use characterization-tests for the contract checks) |
   | 28, 30–38 | performance-change |

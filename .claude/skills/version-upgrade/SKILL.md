@@ -1,6 +1,6 @@
 ---
 name: version-upgrade
-description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5, 17-27, E3 (Docker runtime moves to embedded Tomcat) and E4 (Boot auto-configuration). Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
+description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5, 17-26, E3 (Docker runtime moves to embedded Tomcat), E5 (remove external-Tomcat deployment), E6 (WAR to executable JAR) and E4 (Boot auto-configuration). Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
 ---
 
 # One-at-a-time version upgrade
@@ -18,16 +18,16 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
   - `maven-compiler-plugin` `<source>`/`<target>`, currently 11;
   - per-dependency `<version>` pins.
 - `docker/build/Dockerfile`: the Maven build image and the runtime image.
-  - Until plan step E3, the runtime image is `tomcat:9-jdk11`, with the WAR deployed as `ROOT.war`.
-  - From E3 on, it is `eclipse-temurin:<jdk>-jre`, running `java -jar`. Tomcat is embedded, and Spring Boot manages its version, so a Tomcat upgrade is a Spring Boot upgrade.
+  - The runtime image is `eclipse-temurin:<jdk>-jre`, running `java -jar` (since plan step E3; before it was `tomcat:9-jdk11` with `ROOT.war`).
+  - There is no Tomcat installation anywhere: Tomcat is embedded and Spring Boot manages its version, so a Tomcat upgrade is a Spring Boot upgrade. External-Tomcat deployment is removed in E5, and the build produces a JAR from E6 on.
 - `.github/workflows/maven.yml`: `actions/checkout@v2`, `actions/setup-java@v1`, `java-version: 1.11`.
-- `src/main/webapp/resources/js/external`: vendored JS. It is loaded from `WEB-INF/views/fragments/header.html`; after step 13, from the static `index.html`.
+- Vendored JS: `src/main/webapp/resources/js/external` until E6, then `src/main/resources/static/resources/js/external`. It is loaded from the `fragments/header.html` template; after step 13, from the static `index.html`.
 
 ## Procedure
 1. **Baseline** on a clean working tree.
    - Run `mvn -B package`.
    - Record the test count from `target/surefire-reports/TEST-*.xml`: sum `tests` minus `skipped`.
-   - Save `mvn dependency:tree` output to a scratch file **outside the repo**.
+   - Save `mvn dependency:tree` output to a scratch file under `target/` (build output, not committed; the IDE guard refuses writes outside the project). Do not run `mvn clean` before the comparison.
 2. **Tag the major upgrades** (steps 17, 19, 23). Propose `git tag pre-<step>` and create it only after the user confirms.
 3. **Bump exactly one thing.** When the plan says so, remove pins that Boot already manages (step 5: HikariCP, byte-buddy, objenesis).
 4. **App-impact checklist.**
