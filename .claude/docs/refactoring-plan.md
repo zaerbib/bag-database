@@ -120,7 +120,7 @@ Goal: the application starts with `java -jar bag-database.war` on Spring Boot's 
     - A Docker compose smoke test on the unchanged `tomcat:9` image proves the external-Tomcat mode still works.
   - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
 
-- [ ] **E2. Tomcat settings as Spring Boot properties.**
+- [x] **E2. Tomcat settings as Spring Boot properties.**
   - Move what `src/main/docker/server.xml` configures into `application.properties`:
     - `server.port=8080`;
     - `server.tomcat.threads.max=150`, `server.tomcat.threads.min-spare=25`;
