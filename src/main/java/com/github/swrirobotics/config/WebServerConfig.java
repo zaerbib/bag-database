@@ -50,8 +50,7 @@ import javax.servlet.MultipartConfigElement;
 import java.util.EnumSet;
 
 /**
- * Registers the DispatcherServlet, the servlet filters and the error page.  Spring Boot applies these
- * registration beans both on the embedded server and when the WAR is deployed to an external Tomcat.
+ * Registers the DispatcherServlet, the servlet filters and the error page on the embedded server.
  *
  * Filter order: character encoding, then Spring Session, then multipart parsing, then Spring Security.
  * The session and security filters are registered by bean name, through a DelegatingFilterProxy,

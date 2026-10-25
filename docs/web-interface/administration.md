@@ -86,7 +86,7 @@ Changes the admin password.
 
 This panel can be used to view or modify various configuration options for the Bag Database.
 This is only useful for modifying the configuration if you are running the Bag Database
-in a standalone Tomcat server; if you are running it using the Docker image, these values
+without Docker; if you are running it using the Docker image, these values
 will be overwritten every time the container starts based on its environment variables.
 
 ![Bag Database Configuration](../assets/images/configuration.png)

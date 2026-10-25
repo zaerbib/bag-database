@@ -54,7 +54,7 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
    - Do **not** add blanket `--add-opens`. Add one only for a stack trace you actually observed, and scope it to the module and package named in the error.
    - Put it in the surefire `argLine` for tests.
    - For the container, put it in `JAVA_OPTS`, which `src/main/docker/entrypoint.sh` passes to `exec java $JAVA_OPTS -jar` since E3. Set the default with `ENV JAVA_OPTS` in the Dockerfile.
-   - For installations without Docker, document the same flag in `docs/installation/standalone.md` (added by E5; there is no external-Tomcat installation, so no `CATALINA_OPTS` / `setenv.sh`).
+   - For installations without Docker, document the same flag in `docs/installation/standalone.md` (JVM options go before `-jar`; there is no Tomcat installation, so no `CATALINA_OPTS` / `setenv.sh`).
    - `ConfigService` is skipped under the `test` profile, so yamlbeans is **not exercised by tests**. Check it on a running container.
 4. **`javax.annotation.PostConstruct`** is used in `AdminController`, `BagScanner`, `ScriptService` and `StatusService`. It left the JDK in Java 11 and comes from a dependency.
    - Hop 18: nothing to change. Confirm it still resolves with `mvn dependency:tree -Dincludes=*:*annotation*`.

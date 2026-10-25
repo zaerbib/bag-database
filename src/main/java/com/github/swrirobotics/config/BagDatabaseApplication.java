@@ -36,16 +36,11 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
 import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.annotation.Import;
 
 /**
- * The application's single entry point, in both launch modes:
- * <ul>
- *     <li>{@code java -jar bag-database.war} calls {@link #main} and starts an embedded Tomcat;</li>
- *     <li>an external Tomcat finds this {@link SpringBootServletInitializer} when it deploys the WAR.</li>
- * </ul>
+ * The application's entry point: {@code java -jar bag-database.war} calls {@link #main} and starts the
+ * embedded Tomcat, which is the only supported runtime (the WAR is not deployed into an external Tomcat).
  * Everything is still configured explicitly by the imported config classes.  Only the auto-configurations
  * needed to run the embedded server are imported; the rest of Boot's auto-configuration would compete
  * with the hand-wired DataSource, JPA, Liquibase, Spring Session, Thymeleaf, MVC and Security beans.
@@ -63,13 +58,8 @@ import org.springframework.context.annotation.Import;
 @ImportAutoConfiguration({ServletWebServerFactoryAutoConfiguration.class,
                           EmbeddedWebServerFactoryCustomizerAutoConfiguration.class,
                           WebSocketServletAutoConfiguration.class})
-public class BagDatabaseApplication extends SpringBootServletInitializer {
+public class BagDatabaseApplication {
     public static void main(String[] args) {
         SpringApplication.run(BagDatabaseApplication.class, args);
-    }
-
-    @Override
-    protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
-        return builder.sources(BagDatabaseApplication.class);
     }
 }

@@ -10,8 +10,7 @@ spring:
     # 10-second SIGKILL
     timeout-per-shutdown-phase: 8s
 
-# Embedded Tomcat settings, carried over from src/main/docker/server.xml. An external Tomcat ignores them
-# and uses its own server.xml.
+# Embedded Tomcat settings, carried over from the former src/main/docker/server.xml.
 server:
   port: 8080
   # Let in-flight requests finish on SIGTERM (docker stop), within spring.lifecycle below
@@ -40,6 +39,6 @@ server:
       suffix: .txt
       pattern: '%h %l %u %t "%r" %s %b'
   servlet:
-    # WebMvcConfig forwards unmapped requests to the container's "default" servlet, which an external
-    # Tomcat always has but Boot's embedded Tomcat only registers when asked to
+    # WebMvcConfig forwards unmapped requests to the container's "default" servlet, which Boot's embedded
+    # Tomcat only registers when asked to
     register-default-servlet: true

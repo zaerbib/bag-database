@@ -180,7 +180,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - [x] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
   - *Rollback:* redeploy the `pre-E3` image; reverting the Dockerfile brings back `tomcat:9`.
 
-- [ ] **E5. Remove external-Tomcat deployment: Spring Boot's embedded Tomcat is the only runtime.**
+- [x] **E5. Remove external-Tomcat deployment: Spring Boot's embedded Tomcat is the only runtime.**
   - **Contract change** (name it in the commit and the CHANGELOG): the WAR can no longer be deployed into an external Tomcat. Supported ways to run: `java -jar` and the Docker image.
   - `BagDatabaseApplication` no longer extends `SpringBootServletInitializer`; it keeps only `main`. Nothing else implements `WebApplicationInitializer`.
   - `pom.xml`:
@@ -199,6 +199,11 @@ These steps come first because the plan cannot be validated without tests, and b
     - `mvn dependency:tree` shows no `provided` Tomcat or Servlet API artifact; the WAR has no `WEB-INF/lib-provided`.
     - The application starts from a plain IDE run configuration (no provided-scope option).
     - Docker no-auth smoke test: starts, bags listed, logs in `/usr/local/tomcat/logs`.
+  - *Results (2026-10-25, Phase 0b run):*
+    - [x] Full suite green, 123 tests; `EmbeddedServerTest` and `EmbeddedServerSettingsTest` pass.
+    - [x] `dependency:tree`: `spring-boot-starter-tomcat` and the `tomcat-embed-*` jars are `compile` (through `spring-boot-starter-web`); `javax.servlet-api` only appears transitively in `test` scope. The WAR has no `WEB-INF/lib-provided`.
+    - [x] Plain run configuration: `BagDatabaseApplication` launched with only the compile+runtime classpath (`dependency:build-classpath -Dmdep.includeScope=runtime`, what an IDE uses without "include provided"). No `ClassNotFoundException`; the context gets to opening the DataSource (it failed there only because no `settings.yml` pointed it at a PostGIS).
+    - [x] Docker no-auth smoke test against a throwaway PostGIS: starts, OpenCV loads, `/`, `/resources/**`, the login page and `bags/search` answer, SockJS info and WebSocket upgrade (101), anonymous upload refused (401), `bag_database.log` and the access log in `/usr/local/tomcat/logs`, `docker stop` in 2 s. Image 1.85 GB.
   - *Rollback:* revert the PR; the external-Tomcat mode of E1 comes back.
 
 - [ ] **E6. Executable JAR: no more WAR packaging.**

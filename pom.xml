@@ -60,13 +60,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <!-- Provided: an external Tomcat must not load a second Tomcat. The executable WAR still
-             runs the embedded one, from WEB-INF/lib-provided. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-tomcat</artifactId>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -263,12 +256,6 @@
             <groupId>javax.inject</groupId>
             <artifactId>javax.inject</artifactId>
             <version>1</version>
-        </dependency>
-        <!-- Servlet -->
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <scope>provided</scope>
         </dependency>
         <!-- JSON -->
         <dependency>
@@ -487,7 +474,7 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- Executable WAR: java -jar starts the embedded Tomcat; still deployable to an external Tomcat -->
+                <!-- Executable WAR: java -jar starts the embedded Tomcat, the only supported runtime -->
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <!-- The repackage execution is declared by spring-boot-starter-parent -->
