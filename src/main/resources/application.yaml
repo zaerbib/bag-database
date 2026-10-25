@@ -38,7 +38,3 @@ server:
       prefix: localhost_access_log
       suffix: .txt
       pattern: '%h %l %u %t "%r" %s %b'
-  servlet:
-    # WebMvcConfig forwards unmapped requests to the container's "default" servlet, which Boot's embedded
-    # Tomcat only registers when asked to
-    register-default-servlet: true

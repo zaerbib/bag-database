@@ -67,7 +67,7 @@ These steps come first because the plan cannot be validated without tests, and b
 
 ---
 
-## [ ] Phase 0b — Remove Tomcat: run as a Spring Boot application with its embedded Tomcat (still on the current stack)
+## [x] Phase 0b — Remove Tomcat: run as a Spring Boot application with its embedded Tomcat (still on the current stack)
 
 **Goal: there is no Tomcat to install, and nothing is deployed into a Tomcat.**
 - The application is a Spring Boot application started with `java -jar bag-database.jar`. Spring Boot brings its own embedded Tomcat; its version is managed by Spring Boot.
@@ -75,7 +75,7 @@ These steps come first because the plan cannot be validated without tests, and b
 - The Docker image is a plain JRE image (`eclipse-temurin`) running `java -jar`. Outside Docker, the only requirements are a JDK and PostGIS.
 - See [`audit.md` §8](audit.md#8-runtime-and-deployment).
 
-**Where we stand:** E1–E3 are implemented and committed, but not checked. They put the embedded Tomcat in place and moved the Docker image off `tomcat:9`, but as a transition they still build a WAR that can also be deployed into an external Tomcat. **E5 removes that external-Tomcat mode and E6 switches the packaging to a JAR. Phase 0b is complete only when both are done.**
+**Where we stand (2026-10-25):** Phase 0b is complete. E1–E3 put the embedded Tomcat in place and moved the Docker image off `tomcat:9`; E5 removed the external-Tomcat mode and E6 switched the packaging to an executable JAR. The S3 storage backend was also removed during this phase, by decision, in its own commit.
 
 **Chosen approach: embedded Tomcat with the explicit configuration first, Boot auto-configuration later.**
 - **Embedded Tomcat now, Boot auto-configuration later (step E4).**
@@ -206,7 +206,7 @@ These steps come first because the plan cannot be validated without tests, and b
     - [x] Docker no-auth smoke test against a throwaway PostGIS: starts, OpenCV loads, `/`, `/resources/**`, the login page and `bags/search` answer, SockJS info and WebSocket upgrade (101), anonymous upload refused (401), `bag_database.log` and the access log in `/usr/local/tomcat/logs`, `docker stop` in 2 s. Image 1.85 GB.
   - *Rollback:* revert the PR; the external-Tomcat mode of E1 comes back.
 
-- [ ] **E6. Executable JAR: no more WAR packaging.**
+- [x] **E6. Executable JAR: no more WAR packaging.**
   - Prerequisite: E5. This step does **not** wait for step 13 or E4: the Thymeleaf views are moved to the classpath, not removed.
   - Move the content of `src/main/webapp` to the classpath (`git mv`, no content change):
     - `WEB-INF/views/` → `src/main/resources/templates/`; in `WebMvcConfig`, the template resolver prefix becomes `classpath:/templates/`.
@@ -223,6 +223,10 @@ These steps come first because the plan cannot be validated without tests, and b
     - Full suite; `EmbeddedServerTest` still serves `/`, `/resources/**` and the error page, now from the classpath.
     - A test that `/resources/js/compressed.js` and `/resources/docs/index.html` are served from the packaged JAR (or a check of the JAR listing in CI).
     - `java -jar target/bag-database-<version>.jar` against PostGIS; Docker no-auth smoke test, including a page with i18n messages (the login page) and `DEBUG_JAVASCRIPT=false` (compressed JavaScript).
+  - *Results (2026-10-25, Phase 0b run):*
+    - [x] Full suite green, 126 tests. `EmbeddedServerTest` serves `/`, `/resources/**` and the error page from the classpath, and gains three tests: `compressed.js` is served, templates resolve i18n messages, no default servlet is registered.
+    - [x] JAR listing: `BOOT-INF/classes/static/resources/js/compressed.js`, `static/resources/docs/index.html`, `templates/`, `i18n/messages.properties`; no `WEB-INF`. Only `application-min.js` is left uncombined, as in the former WAR.
+    - [x] `java -jar` on the JAR against a throwaway PostGIS, through the Docker image (`/app/bag-database.jar`, `DEBUG_JAVASCRIPT=false`): starts in 40 s, OpenCV loads from `BOOT-INF/lib`; `/` and the login page render the i18n title and load `compressed.js`; `/resources/**`, `/favicon.ico` and `/resources/docs/index.html` answer 200; `bags/search`, SockJS info and the WebSocket upgrade (101) work; an unknown URL gets the general error page (404); anonymous upload is refused (401); logs in `/usr/local/tomcat/logs`; `docker stop` is graceful in 2 s. Image 1.85 GB.
   - *Rollback:* revert the PR; `war` packaging and `src/main/webapp` come back.
 
 ---

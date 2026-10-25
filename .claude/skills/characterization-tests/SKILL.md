@@ -21,7 +21,7 @@ The contract tests from plan step 3 are the regression oracle for every later st
 ## Procedure
 1. **Inventory the surface the step touches.**
    - Grep `@RequestMapping|@GetMapping|@PostMapping` in `src/main/java/com/github/swrirobotics/**/*Controller.java`.
-   - Grep the JS callers in `src/main/webapp/resources/js`: look for `url:` and literals like `'bags/` or `'scripts/`.
+   - Grep the JS callers in `src/main/resources/static/resources/js`: look for `url:` and literals like `'bags/` or `'scripts/`.
    - Produce a list of (HTTP method, path, params, JS caller).
 2. **Locate or create the test class** in the controller's package under `src/test/java/com/github/swrirobotics/<pkg>/`.
    - Extend `WebAppConfigurationAware`, or `WebSecurityConfigurationAware` for auth.
@@ -47,7 +47,7 @@ The contract tests from plan step 3 are the regression oracle for every later st
    mvn test -Dtest=<ClassName>
    mvn -B package
    ```
-   `mvn -B package` runs the whole suite, generates REST Docs and builds the WAR.
+   `mvn -B package` runs the whole suite, generates REST Docs and builds the JAR.
 7. **Failures after the change.**
    - A contract test that passed before and fails now is a behavior change. **Stop and report it.**
    - Change an assertion only when the plan step intends the contract change (e.g. 4b removes secrets from `config/get`; 13 drops non-`/api` routes). Name that change in the commit message.

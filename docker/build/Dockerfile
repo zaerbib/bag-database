@@ -12,7 +12,7 @@ RUN mvn -e -B dependency:resolve
 COPY src ./src
 RUN mvn -e -B package
 
-# The application runs on its embedded Tomcat: java -jar on the executable WAR
+# The application runs on its embedded Tomcat: java -jar on the executable JAR
 FROM eclipse-temurin:11-jre
 
 LABEL maintainer="david.anthony@swri.org"
@@ -30,7 +30,7 @@ RUN apt-get update \
 # The working directory is Tomcat's base directory (server.tomcat.basedir=.), so bag_database.log and the
 # access log are written to /usr/local/tomcat/logs
 WORKDIR /usr/local/tomcat
-COPY --from=base-layer /app/target/*.war /app/bag-database.war
+COPY --from=base-layer /app/target/*.jar /app/bag-database.jar
 COPY src/main/docker/entrypoint.sh /
 
 CMD ["/entrypoint.sh"]

@@ -10,8 +10,8 @@ permalink: /installation/standalone
 # Running without Docker
 
 The Bag Database is a Spring Boot application with an embedded Tomcat: it is started with
-`java -jar` and does not need an application server.  Deploying the WAR file into an external
-Tomcat is no longer supported.
+`java -jar` and does not need an application server.  Deploying it into an external Tomcat is no
+longer supported.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Tomcat is no longer supported.
 
 `mvn package`
 
-This produces `target/bag-database-<version>.war`, an executable archive that contains the embedded
+This produces `target/bag-database-<version>.jar`, an executable JAR that contains the embedded
 Tomcat.
 
 ## Running
@@ -55,7 +55,7 @@ you don't want to set can be omitted.
 3. Start the application:
 
     ```bash
-    java -jar bag-database-<version>.war
+    java -jar bag-database-<version>.jar
     ```
 
     It listens on port 8080.  Logs are written to `logs/` under the working directory:
@@ -70,9 +70,9 @@ JVM options, passed on the command line:
 
 - Server settings are `server.*` properties, for example `--server.port=9090` or
 `--server.servlet.context-path=/bagdb` to serve the application from a subdirectory.  The defaults are
-in `application.yaml` inside the archive; an `application.yaml` in the working directory, or in its
+in `application.yaml` inside the JAR; an `application.yaml` in the working directory, or in its
 `config/` subdirectory, overrides them.
-- JVM options go before `-jar`, for example `java -Xmx4g -jar bag-database-<version>.war`.
+- JVM options go before `-jar`, for example `java -Xmx4g -jar bag-database-<version>.jar`.
 
 ## Running as a service
 
@@ -86,7 +86,7 @@ After=network.target postgresql.service
 [Service]
 User=bagdb
 WorkingDirectory=/opt/bag-database
-ExecStart=/usr/bin/java -Xmx4g -jar /opt/bag-database/bag-database.war
+ExecStart=/usr/bin/java -Xmx4g -jar /opt/bag-database/bag-database.jar
 SuccessExitStatus=143
 Restart=on-failure
 

@@ -39,8 +39,8 @@ import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServlet
 import org.springframework.context.annotation.Import;
 
 /**
- * The application's entry point: {@code java -jar bag-database.war} calls {@link #main} and starts the
- * embedded Tomcat, which is the only supported runtime (the WAR is not deployed into an external Tomcat).
+ * The application's entry point: {@code java -jar bag-database.jar} calls {@link #main} and starts the
+ * embedded Tomcat, which is the only supported runtime.
  * Everything is still configured explicitly by the imported config classes.  Only the auto-configurations
  * needed to run the embedded server are imported; the rest of Boot's auto-configuration would compete
  * with the hand-wired DataSource, JPA, Liquibase, Spring Session, Thymeleaf, MVC and Security beans.

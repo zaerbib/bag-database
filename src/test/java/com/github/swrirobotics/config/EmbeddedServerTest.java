@@ -93,6 +93,29 @@ public class EmbeddedServerTest {
     }
 
     @Test
+    public void servesTheCompressedJavaScriptFromTheClasspath() {
+        // Written to target/classes/static/resources/js by yuicompressor during process-resources
+        ResponseEntity<String> response = myRestTemplate.getForEntity("/resources/js/compressed.js", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("Ext.define");
+    }
+
+    @Test
+    public void templatesResolveI18nMessages() {
+        ResponseEntity<String> response = myRestTemplate.getForEntity("/", String.class);
+
+        // An unresolved message would render as ??view.index.title_en??
+        assertThat(response.getBody()).contains("<title>Bag Database</title>").doesNotContain("??");
+    }
+
+    @Test
+    public void noDefaultServletIsRegistered() {
+        // Static files come from the classpath through the /resources/** handler, not from a document root
+        assertThat(tomcatContext().findChild("default")).isNull();
+    }
+
+    @Test
     public void sockJsEndpointAnswers() {
         ResponseEntity<String> response = myRestTemplate.getForEntity("/register/info", String.class);
 

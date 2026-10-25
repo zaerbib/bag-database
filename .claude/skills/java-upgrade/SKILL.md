@@ -40,7 +40,7 @@ Editing `CLAUDE.md` and `docs/` requires the user's approval.
    - openpnp documents `loadShared()` as unsupported on Java 12+, with `loadLocally()` as the replacement. Confirm this against the library's README or source for the version in use.
    - If it is true, image endpoints for Bayer and other OpenCV-decoded formats degrade **silently**.
    - Check the startup log for `Unable to load OpenCV`.
-   - Since E1/E3, the library is loaded from a nested JAR inside the executable archive (`WEB-INF/lib` of the WAR, `BOOT-INF/lib` of the JAR after E6). Check the container, not only `mvn test`, because the tests use an exploded classpath.
+   - Since E1/E3, the library is loaded from a nested JAR inside the executable archive (`BOOT-INF/lib` of the executable JAR since E6; `WEB-INF/lib` of the WAR before). Check the container, not only `mvn test`, because the tests use an exploded classpath.
    - If it fails, switch to `nu.pattern.OpenCV.loadLocally()` in its own small commit, and add a test that asserts OpenCV loaded, e.g. `new org.opencv.core.Mat()` does not throw.
 2. **Bytecode libraries pinned too old.** These must support the target class-file version (61 for Java 17, 65 for Java 21):
    - `byte-buddy` is pinned at **1.10.10, compile scope** (pom ~line 325). Hibernate 5.4 proxies and Mockito 4.4 use it at runtime.

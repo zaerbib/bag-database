@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.swri-robotics</groupId>
     <artifactId>bag-database</artifactId>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
     <version>3.5.3</version>
     <name>Bag Database</name>
     <properties>
@@ -458,7 +458,8 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${project.build.directory}/${project.build.finalName}/resources/docs</outputDirectory>
+                            <!-- Served at /resources/docs/ from the JAR; prepare-package runs before the jar goal -->
+                            <outputDirectory>${project.build.outputDirectory}/static/resources/docs</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>
@@ -474,7 +475,7 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- Executable WAR: java -jar starts the embedded Tomcat, the only supported runtime -->
+                <!-- Executable JAR: java -jar starts the embedded Tomcat, the only supported runtime -->
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <!-- The repackage execution is declared by spring-boot-starter-parent -->
@@ -490,7 +491,9 @@
                     <aggregations>
                         <aggregation>
                             <removeIncluded>true</removeIncluded>
-                            <output>${project.build.directory}/${project.build.finalName}/resources/js/compressed.js</output>
+                            <!-- The -min.js inputs are compressed from src/main/resources/static into the same
+                                 directory during process-resources -->
+                            <output>${project.build.outputDirectory}/static/resources/js/compressed.js</output>
                             <includes>
                                 <!-- This is pretty ugly, but because some files
                                 depend on others, we have to ensure they're loaded

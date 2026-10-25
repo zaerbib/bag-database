@@ -21,7 +21,7 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
   - The runtime image is `eclipse-temurin:<jdk>-jre`, running `java -jar` (since plan step E3; before it was `tomcat:9-jdk11` with `ROOT.war`).
   - There is no Tomcat installation anywhere: Tomcat is embedded and Spring Boot manages its version, so a Tomcat upgrade is a Spring Boot upgrade. External-Tomcat deployment was removed in E5, and the build produces a JAR from E6 on.
 - `.github/workflows/maven.yml`: `actions/checkout@v2`, `actions/setup-java@v1`, `java-version: 1.11`.
-- Vendored JS: `src/main/webapp/resources/js/external` until E6, then `src/main/resources/static/resources/js/external`. It is loaded from the `fragments/header.html` template; after step 13, from the static `index.html`.
+- Vendored JS: `src/main/resources/static/resources/js/external` (in `src/main/webapp/resources/js/external` before E6). It is loaded from the `fragments/header.html` template; after step 13, from the static `index.html`.
 
 ## Procedure
 1. **Baseline** on a clean working tree.

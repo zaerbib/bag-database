@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as an executable **WAR**: it runs with `java -jar` on Spring Boot's embedded Tomcat, the only supported runtime (no deployment into an external Tomcat). It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
+The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as an executable **JAR**: it runs with `java -jar` on Spring Boot's embedded Tomcat, the only supported runtime (no deployment into an external Tomcat). It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
 
 ## Commands
 
 Requires JDK 11 and Maven (no wrapper in the repo). CI runs `mvn -B package`.
 
 ```bash
-mvn -B package                         # compile, run tests, generate REST docs, build target/bag-database-<version>.war
+mvn -B package                         # compile, run tests, generate REST docs, build target/bag-database-<version>.jar
 mvn test                               # run all tests
 mvn test -Dtest=BagServiceTest         # run a single test class
 mvn test -Dtest=BagServiceTest#method  # run a single test method
-mvn -DskipTests package                # build WAR without tests
-java -jar target/bag-database-<version>.war   # run on the embedded Tomcat (needs ~/.ros-bag-database/settings.yml and PostGIS)
+mvn -DskipTests package                # build the JAR without tests
+java -jar target/bag-database-<version>.jar   # run on the embedded Tomcat (needs ~/.ros-bag-database/settings.yml and PostGIS)
 mvn spring-boot:run                    # same, from sources
 docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> eclipse-temurin:11-jre running java -jar
 ```
@@ -33,7 +33,7 @@ docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> 
 - **Scripts (`scripts/`):** user-defined post-processing scripts run in Docker containers via `docker-java-api` against the configured `dockerHost`; `ScriptService` polls on a schedule and can auto-run scripts matching `ScriptCriteria`.
 - **Status / push updates:** services extend `StatusProvider`; status and progress are pushed to the browser over STOMP/SockJS websockets (`WebSocketConfig`, `status/`).
 - **Security:** `SecurityConfig` supports local admin account and optional LDAP (`ldap/`); sessions are JDBC-backed (Spring Session).
-- **Frontend:** server-rendered Thymeleaf templates in `src/main/webapp/WEB-INF/views` that load an ExtJS app from `src/main/webapp/resources/js` (`application.js`, `models/`, `stores/`, `views/`). No JS build step — files are served as-is. Controllers return DTOs from `support/web`; `ExtJsFilter` parses ExtJS grid filter params.
+- **Frontend:** server-rendered Thymeleaf templates in `src/main/resources/templates` (i18n messages in `src/main/resources/i18n`) that load an ExtJS app from `src/main/resources/static/resources/js` (`application.js`, `models/`, `stores/`, `views/`), served from the classpath at `/resources/**`. No JS build step — files are served as-is (yuicompressor only builds `compressed.js`). Controllers return DTOs from `support/web`; `ExtJsFilter` parses ExtJS grid filter params.
 - **REST docs:** controller tests use Spring REST Docs (`WebAppConfigurationAware` writes snippets to `target/generated-snippets`), which `asciidoctor-maven-plugin` combines with `src/main/asciidoc/*.adoc` during `prepare-package`.
 
 ## Tests

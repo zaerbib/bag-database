@@ -80,4 +80,4 @@ umask 0027
 
 # exec, so that the JVM receives SIGTERM from docker stop and shuts down gracefully.
 # JAVA_OPTS is split on spaces, so individual options cannot contain spaces.
-exec java ${JAVA_OPTS} -jar /app/bag-database.war ${CONTEXT_PATH_ARG:+"$CONTEXT_PATH_ARG"}
+exec java ${JAVA_OPTS} -jar /app/bag-database.jar ${CONTEXT_PATH_ARG:+"$CONTEXT_PATH_ARG"}
