@@ -43,9 +43,9 @@ public class Configuration implements Serializable {
 
     private String bagPath = "/bags";
     private String dockerHost = "";
-    private String driver = "org.h2.Driver";
-    private String jdbcUsername = "sa";
-    private String jdbcUrl = "jdbc:h2:mem:testdb";
+    private String driver = "org.postgresql.Driver";
+    private String jdbcUsername = "bag_database";
+    private String jdbcUrl = "jdbc:postgresql://localhost/bag_database";
     private String jdbcPassword = "";
     private String googleApiKey = "";
     private String scriptTmpPath = "/scripts";

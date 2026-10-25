@@ -1,6 +1,6 @@
 ---
 name: characterization-tests
-description: Pin existing API behavior with MockMvc contract tests before a change and prove it is unchanged after; also access-control (anonymous/user/admin, CSRF) tests. Use for refactoring-plan steps that mention "contract tests", "add the test before the change", security fixes, or "JSON unchanged" (steps 1, 3, 4a-d, 6, 9, 10, 13, 15, 29, 30, 32, 37). Not for performance measurements (performance-change) or schema migrations (liquibase-changeset).
+description: Pin existing API behavior with MockMvc contract tests before a change and prove it is unchanged after; also access-control (anonymous/user/admin, CSRF) tests. Use for refactoring-plan steps that mention "contract tests", "add the test before the change", security fixes, or "JSON unchanged" (steps 1, 3, 4a-d, E1, E2, E5, E6, 6, 9, 10, 13, 15, 29, 30, 32, 37). Not for performance measurements (performance-change) or schema migrations (liquibase-changeset).
 ---
 
 # Characterization / contract tests
@@ -21,7 +21,7 @@ The contract tests from plan step 3 are the regression oracle for every later st
 ## Procedure
 1. **Inventory the surface the step touches.**
    - Grep `@RequestMapping|@GetMapping|@PostMapping` in `src/main/java/com/github/swrirobotics/**/*Controller.java`.
-   - Grep the JS callers in `src/main/webapp/resources/js`: look for `url:` and literals like `'bags/` or `'scripts/`.
+   - Grep the JS callers in `src/main/resources/static/resources/js`: look for `url:` and literals like `'bags/` or `'scripts/`.
    - Produce a list of (HTTP method, path, params, JS caller).
 2. **Locate or create the test class** in the controller's package under `src/test/java/com/github/swrirobotics/<pkg>/`.
    - Extend `WebAppConfigurationAware`, or `WebSecurityConfigurationAware` for auth.
@@ -47,7 +47,7 @@ The contract tests from plan step 3 are the regression oracle for every later st
    mvn test -Dtest=<ClassName>
    mvn -B package
    ```
-   `mvn -B package` runs the whole suite, generates REST Docs and builds the WAR.
+   `mvn -B package` runs the whole suite, generates REST Docs and builds the JAR.
 7. **Failures after the change.**
    - A contract test that passed before and fails now is a behavior change. **Stop and report it.**
    - Change an assertion only when the plan step intends the contract change (e.g. 4b removes secrets from `config/get`; 13 drops non-`/api` routes). Name that change in the commit message.

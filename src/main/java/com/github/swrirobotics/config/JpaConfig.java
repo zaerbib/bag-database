@@ -33,7 +33,6 @@ package com.github.swrirobotics.config;
 import com.github.swrirobotics.BagApplication;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import org.h2gis.functions.factory.H2GISDBFactory;
 import org.hibernate.cfg.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +51,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.TransactionManagementConfigurer;
 
 import javax.sql.DataSource;
-import java.sql.SQLException;
 import java.util.Properties;
 
 @Configuration
@@ -61,6 +59,8 @@ import java.util.Properties;
         transactionManagerRef = "annotationDrivenTransactionManager")
 @EnableJdbcHttpSession
 public class JpaConfig implements TransactionManagementConfigurer {
+    private static final String POSTGRES_DRIVER = "org.postgresql.Driver";
+
     @Autowired(required = false)
     private DataSourceProperties properties;
 
@@ -73,6 +73,12 @@ public class JpaConfig implements TransactionManagementConfigurer {
         myLogger.info("JDBC URL: " + properties.getUrl());
         myLogger.info("JDBC Username: " + properties.getUsername());
 
+        // PostGIS is the only supported database; the embedded H2 database is for tests only
+        if (!POSTGRES_DRIVER.equals(properties.getDriver())) {
+            throw new IllegalStateException("Unsupported JDBC driver \"" + properties.getDriver() +
+                    "\"; set the \"driver\" setting (DB_DRIVER in Docker) to " + POSTGRES_DRIVER + ".");
+        }
+
         HikariConfig config = new HikariConfig();
         config.setDriverClassName(properties.getDriver());
         config.setJdbcUrl(properties.getUrl());
@@ -84,22 +90,9 @@ public class JpaConfig implements TransactionManagementConfigurer {
         config.addDataSourceProperty("useServerPrepStmts", "true");
         config.addDataSourceProperty("initializationFailTimeout", "10000");
 
-        if (properties.getDriver().equals("org.postgresql.Driver")) {
-            System.setProperty("hibernate.dialect", "org.hibernate.spatial.dialect.postgis.PostgisDialect");
+        System.setProperty("hibernate.dialect", "org.hibernate.spatial.dialect.postgis.PostgisDialect");
 
-            return new HikariDataSource(config);
-        }
-        else {
-            System.setProperty("hibernate.dialect", "org.hibernate.spatial.dialect.h2geodb.GeoDBDialect");
-
-            try {
-                return H2GISDBFactory.createDataSource("testdb", true);
-            }
-            catch (SQLException e) {
-                myLogger.error("Unable to open spatial H2 database.");
-                return null;
-            }
-        }
+        return new HikariDataSource(config);
     }
 
     @Bean

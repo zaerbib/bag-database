@@ -33,6 +33,6 @@ package com.github.swrirobotics;
 /**
  * This class only exists to serve as a top-level class that we can use as the start
  * point for component scanning.
- * Spring's entry point is in com.github.swrirobotics.config.ApplicationConfig.
+ * Spring's entry point is com.github.swrirobotics.config.BagDatabaseApplication.
  */
 public class BagApplication {}

@@ -1,0 +1,57 @@
+app:
+  version: "3.0"
+
+spring:
+  profiles:
+    # Production profile unless spring.profiles.active says otherwise (tests use "test")
+    default: default
+  lifecycle:
+    # Graceful shutdown waits for open async video streams; stop waiting before docker stop's
+    # 10-second SIGKILL
+    timeout-per-shutdown-phase: 8s
+  datasource : # The default connection pool is HikariCP, which is fast and reliable.
+      # See https://github.com/brettwooldridge/HikariCP for more information.
+      username: ${DB_USER:postgresql}
+      password: ${DB_PASS:admin}
+      url: ${DB_URL:jdbc:postgresql://localhost:5432/postgresql}
+      driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+      hikari:
+        # The default pool size is 10, which is too small for a busy server. 50 is a good starting point.
+        maximum-pool-size: 50
+        minimum-idle: 5
+        idle-timeout: 300000
+        connection-timeout: 20000
+        max-lifetime: 1200000
+        connection-test-query: SELECT 1
+        validation-timeout: 5000
+        leak-detection-threshold: 60000
+        register-mbeans: true
+
+# Embedded Tomcat settings, carried over from the former src/main/docker/server.xml.
+server:
+  port: 8081
+  # Let in-flight requests finish on SIGTERM (docker stop), within spring.lifecycle below
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 2KB
+    mime-types: text/html, text/xml, text/plain, text/css, text/javascript, text/json,
+      application/x-javascript, application/javascript, application/json
+    excluded-user-agents: gozilla, traviata
+  tomcat:
+    # Like CATALINA_BASE: the access log goes to ./logs (next to bag_database.log) and Tomcat's work files
+    # (including multipart upload buffers) to ./work, instead of a new temporary directory on every start
+    basedir: .
+    connection-timeout: 20s
+    threads:
+      max: 150
+      min-spare: 25
+    # Read and discard the rest of a request body that was refused (e.g. an over-limit upload)
+    # instead of cutting the connection; uploads go up to 50 GB.
+    max-swallow-size: -1
+    accesslog:
+      enabled: true
+      directory: logs
+      prefix: localhost_access_log
+      suffix: .txt
+      pattern: '%h %l %u %t "%r" %s %b'

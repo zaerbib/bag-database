@@ -33,6 +33,7 @@ package com.github.swrirobotics.config;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.restdocs.JUnitRestDocumentation;
 import org.springframework.restdocs.mockmvc.MockMvcRestDocumentation;
 import org.springframework.test.context.ActiveProfiles;
@@ -50,14 +51,9 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @ActiveProfiles("test")
 @WebAppConfiguration
 @ContextConfiguration(classes = {
-        ApplicationConfig.class,
-        EmbeddedDataSourceConfig.class,
-        JpaConfig.class,
-        LiquibaseConfig.class,
-        WebMvcConfig.class,
-        WebSocketConfig.class,
-        SecurityConfig.class
-})
+        BagDatabaseApplication.class,
+        EmbeddedDataSourceConfig.class
+}, initializers = ConfigDataApplicationContextInitializer.class)
 public abstract class WebAppConfigurationAware {
     @Rule
     public JUnitRestDocumentation restDocumentation =

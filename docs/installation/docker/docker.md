@@ -25,12 +25,12 @@ volumes and parameters that can be used to configure the Docker container.
 | Volume | Description |
 | ------ | ----------- |
 | `/bags` | Will be monitored for bag files. |
-| `/usr/local/tomcat/logs` | Where Tomcat places its log files. |
+| `/usr/local/tomcat/logs` | Where the Bag Database writes its log files (`bag_database.log` and the HTTP access log). The image no longer contains a Tomcat installation; the application runs on its embedded Tomcat, but keeps this path so that existing volumes keep working. |
 | `/root/.ros-bag-database/indexes` | Where the Bag Database stores its Elasticsearch indexes. |
 
 ### Environment Variables
 
-With the exception of `BAGDB_PATH`, all of these variables are used in the Bag Database container's
+With the exception of `BAGDB_PATH` and `JAVA_OPTS`, all of these variables are used in the Bag Database container's
 `entrypoint.sh` script to generate a file at `${HOME}/.ros-bag-database/settings.yml` that configures
 the Bag Database.  You can generate this file yourself if you have more complex configuration needs;
 see [Storage](../../configuration/storage.md) for an example.
@@ -40,14 +40,15 @@ see [Storage](../../configuration/storage.md) for an example.
 | `ADMIN_PASSWORD` | The default password for administrative access.  If this is not set, one will be randomly generated and printed to the log file on initial startup. | |
 | `BAGDB_PATH` | The subdirectory to serve the Bag DB from.  For example, if this is `bagdb`, you might access it from `http://localhost:8080/bagdb/`.  Leaving this empty (the default) will serve it from the root path. | |
 | `BING_KEY` | The API key to use when connecting to Bing Maps.  You can get an API Key through the [Bing Maps Portal](https://www.bingmapsportal.com/). | |
-| `DB_DRIVER` | The class name of the JDBC driver to use. | org.hsqldb.jdbcDriver |
+| `DB_DRIVER` | The class name of the JDBC driver to use. Only `org.postgresql.Driver` (PostGIS) is supported; the application refuses to start with any other driver. | org.postgresql.Driver |
 | `DB_PASS` | The password to use when connecting to the database. | |
-| `DB_URL` | The JDBC URL for connecting to the database. | jdbc:hsqldb:mem:testdb |
-| `DB_USER` | The username to use when connecting to the database. | sa |
+| `DB_URL` | The JDBC URL for connecting to the database. | jdbc:postgresql://postgres/bag_database |
+| `DB_USER` | The username to use when connecting to the database. | bag_database |
 | `DEBUG_JAVASCRIPT` | Set this to `true` to force the application to load non-minified versions of Javascript files. This will increase load times. | false |
 | `DOCKER_HOST` | The URL to use to connect to a Docker service.  This can be empty if you do not intend to run scripts on bag files. It must be able to mount volumes on the same paths that the Bag Database can access them. TCP URLs should begin with `http://`. | |
 | `GOOGLE_API_KEY` | A Google API key that has permission to use the Google Maps GeoCoding API; this is necessary in order to resolve place names for GPS coordinates.  You can get an API key in the [Google Maps Platform](https://developers.google.com/maps/documentation/geocoding/get-api-key) documentation. | |
 | `GPS_TOPICS` | A comma-separated list of topics to search for GPS messages; the first one found will be used.  Any message that has the fields `float64 latitude`, `float64 longitude`, and `Header header` will work.  If there are no topics configured or none of them are found, it will try to use the first topic it can find that publishes the `sensor_msgs/NavSatFix`, `gps_common/GPSFix`, or `marti_gps_common/GPSFix` messages, in that order. | |
+| `JAVA_OPTS` | Extra options for the Java virtual machine, separated by spaces, for example `-Xmx4g`. Individual options cannot contain spaces. `CATALINA_OPTS` is no longer used, because the image does not contain a Tomcat installation. | |
 | `LDAP_BINDDN` | If authenticating against an LDAP server that requires authentication, the Bind DN.  If this is left blank, it will not attempt to authenticate. | |
 | `LDAP_BIND_PASSWORD` | If authenticating against an LDAP server that requires authentication, the password for the Bind DN. | |
 | `LDAP_SEARCH_BASE` | If authenticating against an LDAP server that requires authentication, the password for the Bind DN. | |

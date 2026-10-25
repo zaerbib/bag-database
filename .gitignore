@@ -2,6 +2,11 @@
 *.ipr
 *.iws
 catalina.*/
+# Written by java -jar / mvn spring-boot:run (server.tomcat.basedir is the working directory)
+/logs/
+/work/
+# Local development configuration (HOME and settings.yml with passwords)
+/config/
 target/
 indexes/
 .idea/

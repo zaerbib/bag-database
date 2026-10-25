@@ -1,6 +1,6 @@
 // *****************************************************************************
 //
-// Copyright (c) 2021, Hatchbed, L.L.C.
+// Copyright (c) 2015, Southwest Research Institute® (SwRI®)
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,15 +28,18 @@
 //
 // *****************************************************************************
 
-package com.github.swrirobotics.bags.storage.s3;
+package com.github.swrirobotics.config;
 
-import com.github.swrirobotics.bags.storage.BagStorageConfiguration;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 
-public class S3BagStorageConfigImpl extends BagStorageConfiguration {
-    public String accessKey;
-    public String secretKey;
-    public String endPoint;
-    public String region;
-    public String bucket;
-    public Long updateIntervalMs = 10000L;
+/**
+ * Enforces {@code @Secured} on controllers and services.
+ *
+ * Controllers and services live in the single application context created by
+ * {@link BagDatabaseApplication}, so enabling method security once covers both.
+ */
+@Configuration
+@EnableGlobalMethodSecurity(securedEnabled = true)
+class MethodSecurityConfig {
 }

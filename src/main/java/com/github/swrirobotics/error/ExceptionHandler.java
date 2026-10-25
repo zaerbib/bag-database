@@ -31,6 +31,8 @@
 package com.github.swrirobotics.error;
 
 import com.google.common.base.Throwables;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.ModelAndView;
@@ -45,7 +47,12 @@ class ExceptionHandler {
      * Handle exceptions thrown by handlers.
      */
     @org.springframework.web.bind.annotation.ExceptionHandler(value = Exception.class)    
-    public ModelAndView exception(Exception exception, WebRequest request) {
+    public ModelAndView exception(Exception exception, WebRequest request) throws Exception {
+        if (exception instanceof AccessDeniedException || exception instanceof AuthenticationException) {
+            // Let Spring Security's ExceptionTranslationFilter turn these into a 401/403 or a redirect
+            // to the login page instead of rendering them as a 200 error page.
+            throw exception;
+        }
         ModelAndView modelAndView = new ModelAndView("error/general");
         modelAndView.addObject("errorMessage", Throwables.getStackTraceAsString(exception));
         return modelAndView;

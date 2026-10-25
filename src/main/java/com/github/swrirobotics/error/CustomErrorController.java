@@ -44,7 +44,7 @@ import java.text.MessageFormat;
 class CustomErrorController {
 
     /**
-     * Display an error page, as defined in web.xml <code>custom-error</code> element.
+     * Display an error page, as registered by WebServerConfig.errorPageRegistrar().
      */
     @RequestMapping("generalError")    
     public String generalError(HttpServletRequest request, HttpServletResponse response, Model model) {

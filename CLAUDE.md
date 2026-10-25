@@ -4,34 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as a **WAR** and deployed into Tomcat. It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
+The Bag Database is a Spring (Boot 2.6 parent, but configured as a classic Spring MVC app) web application packaged as an executable **JAR**: it runs with `java -jar` on Spring Boot's embedded Tomcat, the only supported runtime (no deployment into an external Tomcat). It watches storage backends for ROS bag files, indexes their metadata into a SQL database (PostgreSQL/PostGIS in production), and serves an ExtJS web UI plus a REST API. User docs live in `docs/` (Jekyll site published to GitHub Pages).
 
 ## Commands
 
 Requires JDK 11 and Maven (no wrapper in the repo). CI runs `mvn -B package`.
 
 ```bash
-mvn -B package                         # compile, run tests, generate REST docs, build target/bag-database-<version>.war
+mvn -B package                         # compile, run tests, generate REST docs, build target/bag-database-<version>.jar
 mvn test                               # run all tests
 mvn test -Dtest=BagServiceTest         # run a single test class
 mvn test -Dtest=BagServiceTest#method  # run a single test method
-mvn -DskipTests package                # build WAR without tests
-docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> tomcat:9-jdk11 (ROOT.war)
+mvn -DskipTests package                # build the JAR without tests
+java -jar target/bag-database-<version>.jar   # run on the embedded Tomcat (needs ~/.ros-bag-database/settings.yml and PostGIS)
+mvn spring-boot:run                    # same, from sources
+docker build -f docker/build/Dockerfile .   # multi-stage image: Maven build -> eclipse-temurin:11-jre running java -jar
 ```
 
-`docker/*/docker-compose.yml` contain example deployments (no auth, LDAP, S3, reverse proxy, webviz, private registry).
+`docker/*/docker-compose.yml` contain example deployments (no auth, LDAP, reverse proxy, webviz, private registry).
 
 ## Architecture
 
-- **Configuration is Java-based, not auto-configured.** `config/WebAppInitializer` (a `AbstractAnnotationConfigDispatcherServletInitializer`) explicitly lists the root config classes: `ApplicationConfig`, `JpaConfig`, `LiquibaseConfig`, `WebSocketConfig`, `SecurityConfig`, `WebMvcConfig`. `BagApplication` is only a marker class for package scanning. Tests list the same classes in `WebAppConfigurationAware`'s `@ContextConfiguration`, so a new config class must be added in both places.
+- **Configuration is Java-based, not auto-configured.** `config/BagDatabaseApplication` is the single entry point (`main`, embedded Tomcat). It `@Import`s the config classes (`ApplicationConfig`, `JpaConfig`, `LiquibaseConfig`, `WebSocketConfig`, `SecurityConfig`, `WebMvcConfig`, `WebServerConfig`) into one context and only imports the auto-configurations needed to run the embedded server. A new config class goes in that `@Import`; tests pick it up through `WebAppConfigurationAware`, which loads `BagDatabaseApplication`. `WebServerConfig` registers the `DispatcherServlet`, the filters (encoding → session → multipart → security) and the error page. `BagApplication` is only a marker class for package scanning. Spring Boot rejects bean-definition overriding and circular references, unlike the old plain contexts.
 - **Runtime settings come from `~/.ros-bag-database/settings.yml`** (YamlBeans-serialized `support/web/Configuration`), read via `ConfigService`. In Docker, `src/main/docker/entrypoint.sh` generates this file from environment variables on first start — adding a new setting usually means touching `Configuration`, `entrypoint.sh`, and `docs/configuration/`.
 - **Spring profiles:** `default` for production (`ProductionDataSourceProperties`, `BagScanner` only exist here); `test` swaps in an embedded H2GIS datasource (`src/test/.../EmbeddedDataSourceConfig`) and `ConfigService` skips reading settings.yml.
-- **Storage abstraction (`bags/storage`):** `BagStorage` implementations (`filesystem/` with a recursive file watcher, `s3/`) are built from `storageConfigurations` in settings.yml (each `BagStorageConfiguration` names its impl class). Each backend has a `storageId`; changing it causes all bags in it to be re-indexed. Backends fire `BagStorageChangeEvent`s to `BagScanner`, which calls `BagService` to parse bags (via `bag-reader-java`) and persist them. `BagWrapper` abstracts file access per backend.
+- **Storage abstraction (`bags/storage`):** `BagStorage` implementations (only `filesystem/`, with a recursive file watcher; S3 storage was removed) are built from `storageConfigurations` in settings.yml (each `BagStorageConfiguration` names its impl class). Each backend has a `storageId`; changing it causes all bags in it to be re-indexed. Backends fire `BagStorageChangeEvent`s to `BagScanner`, which calls `BagService` to parse bags (via `bag-reader-java`) and persist them. `BagWrapper` abstracts file access per backend.
 - **Persistence:** JPA entities + Spring Data repositories in `persistence/`; Hibernate Spatial is used for GPS positions (`BagPosition`). Schema is managed by **Liquibase** YAML changelogs in `src/main/resources/db/changelog/` — add a new `db.changelog-X.Y.yaml` and include it from `db.changelog-master.yaml`; never edit existing changelogs. JPA metamodel classes are generated by `hibernate-jpamodelgen` at compile time.
 - **Scripts (`scripts/`):** user-defined post-processing scripts run in Docker containers via `docker-java-api` against the configured `dockerHost`; `ScriptService` polls on a schedule and can auto-run scripts matching `ScriptCriteria`.
 - **Status / push updates:** services extend `StatusProvider`; status and progress are pushed to the browser over STOMP/SockJS websockets (`WebSocketConfig`, `status/`).
 - **Security:** `SecurityConfig` supports local admin account and optional LDAP (`ldap/`); sessions are JDBC-backed (Spring Session).
-- **Frontend:** server-rendered Thymeleaf templates in `src/main/webapp/WEB-INF/views` that load an ExtJS app from `src/main/webapp/resources/js` (`application.js`, `models/`, `stores/`, `views/`). No JS build step — files are served as-is. Controllers return DTOs from `support/web`; `ExtJsFilter` parses ExtJS grid filter params.
+- **Frontend:** server-rendered Thymeleaf templates in `src/main/resources/templates` (i18n messages in `src/main/resources/i18n`) that load an ExtJS app from `src/main/resources/static/resources/js` (`application.js`, `models/`, `stores/`, `views/`), served from the classpath at `/resources/**`. No JS build step — files are served as-is (yuicompressor only builds `compressed.js`). Controllers return DTOs from `support/web`; `ExtJsFilter` parses ExtJS grid filter params.
 - **REST docs:** controller tests use Spring REST Docs (`WebAppConfigurationAware` writes snippets to `target/generated-snippets`), which `asciidoctor-maven-plugin` combines with `src/main/asciidoc/*.adoc` during `prepare-package`.
 
 ## Tests

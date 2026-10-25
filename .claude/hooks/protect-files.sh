@@ -34,7 +34,7 @@ case "$tool" in
           decide deny "Existing Liquibase changelogs must never be edited (plan ground rules). Create a new db.changelog-X.Y.yaml with a rollback block instead - see the liquibase-changeset skill."
         fi ;;
       target/*|*/target/*)
-        decide deny "target/ is build output (WAR, surefire reports, generated metamodel). Change the sources instead." ;;
+        decide deny "target/ is build output (JAR, surefire reports, generated metamodel). Change the sources instead." ;;
       .git/*)
         decide deny "Direct edits inside .git/ are not allowed." ;;
       *settings.yml|*.pem|*.key|*.p12|*.jks|.env|.env.*|*/.env)
@@ -45,7 +45,7 @@ case "$tool" in
         decide ask "This changes Claude Code hooks/settings that protect the repo. Confirm." ;;
       .github/workflows/*)
         decide ask "CI workflow change (only expected in plan steps 2, 18, 25). Confirm." ;;
-      src/main/webapp/resources/js/external/*)
+      src/main/resources/static/resources/js/external/*)
         decide ask "Vendored third-party JS (ExtJS, OpenLayers, sockjs, stomp). Only replace in plan step 26, one library per PR. Confirm." ;;
       docs/*)
         decide ask "docs/ is the public Jekyll/GitHub Pages site. Audit and plan material belongs in .claude/docs/. Confirm." ;;

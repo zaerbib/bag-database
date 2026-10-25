@@ -33,6 +33,7 @@ package com.github.swrirobotics.config;
 import com.github.swrirobotics.account.UserService;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.ldap.core.support.LdapContextSource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -58,12 +60,19 @@ import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.MissingCsrfTokenException;
+import org.springframework.security.web.util.matcher.RequestHeaderRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 @EnableWebSecurity
@@ -144,7 +153,22 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                         .antMatchers(
                                 "/favicon.ico",
                                 "/generalError",
-                                "/resources/**").permitAll(); // List resources that any users can access no matter what
+                                "/resources/**").permitAll() // List resources that any users can access no matter what
+                        // Write endpoints are also checked by @Secured, but that only runs once the
+                        // request reaches the controller, i.e. after a multipart upload has been fully
+                        // received. These rules refuse them in the filter chain, before the body is read,
+                        // and must come before the /bags/** and /scripts/** permitAll below.
+                        // "/**" also covers the trailing-slash form, which Spring MVC still routes.
+                        .antMatchers(
+                                "/bags/update/**",
+                                "/bags/upload/**",
+                                "/bags/setTag/**",
+                                "/bags/setTagForBags/**",
+                                "/bags/removeTags/**").authenticated()
+                        .antMatchers(
+                                "/scripts/save/**",
+                                "/scripts/run/**",
+                                "/scripts/delete/**").hasRole("ADMIN");
 
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String ldapServer = null;
@@ -164,7 +188,9 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                     .and()
                         .logout()
                             .logoutUrl("/logout").permitAll()
-                            .logoutSuccessUrl("/ldap_login?logout");
+                            .logoutSuccessUrl("/ldap_login?logout")
+                    .and()
+                        .exceptionHandling().authenticationEntryPoint(authenticationEntryPoint("/ldap_login"));
         }
         else {
             // If we're not using LDAP, the only user role is the administrator; unauthenticated
@@ -186,8 +212,23 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                         .logout()
                             .logoutUrl("/logout")
                             .permitAll()
-                            .logoutSuccessUrl("/signin?logout");
+                            .logoutSuccessUrl("/signin?logout")
+                    .and()
+                        .exceptionHandling().authenticationEntryPoint(authenticationEntryPoint("/signin"));
         }
+    }
+
+    /**
+     * Redirects unauthenticated requests to the login page, except ExtJS AJAX calls, which get a 401;
+     * otherwise they would follow the redirect and treat the HTML login page as a successful response.
+     */
+    private AuthenticationEntryPoint authenticationEntryPoint(String loginPage) {
+        LinkedHashMap<RequestMatcher, AuthenticationEntryPoint> entryPoints = new LinkedHashMap<>();
+        entryPoints.put(new RequestHeaderRequestMatcher("X-Requested-With", "XMLHttpRequest"),
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED));
+        DelegatingAuthenticationEntryPoint entryPoint = new DelegatingAuthenticationEntryPoint(entryPoints);
+        entryPoint.setDefaultEntryPoint(new LoginUrlAuthenticationEntryPoint(loginPage));
+        return entryPoint;
     }
 
     @Bean
@@ -200,7 +241,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String searchBase = "";
         if (config != null) {
-            searchBase = config.getLdapSearchBase();
+            searchBase = StringUtils.defaultString(config.getLdapSearchBase());
         }
         myLogger.info("LDAP search base: [" + searchBase + "]");
         return new DefaultLdapAuthoritiesPopulator(ldapContextSource(), searchBase);
@@ -212,7 +253,8 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String ldapProvider = "";
         if (config != null) {
-            ldapProvider = config.getLdapServer();
+            // Empty settings in settings.yml are read back as null
+            ldapProvider = StringUtils.defaultString(config.getLdapServer());
         }
         myLogger.info("LDAP provider:  [" + ldapProvider + "]");
 
@@ -222,7 +264,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         PasswordPolicyAwareContextSource contextSource = new PasswordPolicyAwareContextSource(ldapProvider);
         if (config != null) {
             String binddn = config.getLdapBindDn();
-            if (!binddn.isEmpty()) {
+            if (StringUtils.isNotEmpty(binddn)) {
                 contextSource.setUserDn(binddn);
                 contextSource.setPassword(myConfigService.getConfiguration().getLdapBindPassword());
             }
@@ -237,7 +279,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
         com.github.swrirobotics.support.web.Configuration config = myConfigService.getConfiguration();
         String userPattern = "";
         if (config != null) {
-            userPattern = config.getLdapUserPattern();
+            userPattern = StringUtils.defaultString(config.getLdapUserPattern());
         }
         myLogger.info("LDAP user pattern: [" + userPattern + "]");
         authenticator.setUserDnPatterns(new String[]{userPattern});

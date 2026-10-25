@@ -1,6 +1,6 @@
 ---
 name: version-upgrade
-description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5 and 17-27. Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
+description: Bump, remove or replace exactly one dependency, platform or tool version (Maven dependency/plugin, Spring Boot/Session/Security, Hibernate, JUnit, docker-java, JDK, Docker base images, GitHub Actions, vendored front-end libs) with baseline, app-impact checklist, full verification and rollback. Use for refactoring-plan steps 5, 17-26, E3 (Docker runtime moves to embedded Tomcat), E5 (remove external-Tomcat deployment), E6 (WAR to executable JAR) and E4 (Boot auto-configuration). Not for schema-only changes (liquibase-changeset) or tuning (performance-change).
 ---
 
 # One-at-a-time version upgrade
@@ -17,21 +17,23 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
   - `<hibernate.version>`, currently 5.4.24.Final, also used by the `hibernate-jpamodelgen` annotation processor;
   - `maven-compiler-plugin` `<source>`/`<target>`, currently 11;
   - per-dependency `<version>` pins.
-- `docker/build/Dockerfile`: the Maven build image and the `tomcat:9-jdk11` runtime image.
+- `docker/build/Dockerfile`: the Maven build image and the runtime image.
+  - The runtime image is `eclipse-temurin:<jdk>-jre`, running `java -jar` (since plan step E3; before it was `tomcat:9-jdk11` with `ROOT.war`).
+  - There is no Tomcat installation anywhere: Tomcat is embedded and Spring Boot manages its version, so a Tomcat upgrade is a Spring Boot upgrade. External-Tomcat deployment was removed in E5, and the build produces a JAR from E6 on.
 - `.github/workflows/maven.yml`: `actions/checkout@v2`, `actions/setup-java@v1`, `java-version: 1.11`.
-- `src/main/webapp/resources/js/external`: vendored JS. It is loaded from `WEB-INF/views/fragments/header.html`; after step 13, from the static `index.html`.
+- Vendored JS: `src/main/resources/static/resources/js/external` (in `src/main/webapp/resources/js/external` before E6). It is loaded from the `fragments/header.html` template; after step 13, from the static `index.html`.
 
 ## Procedure
 1. **Baseline** on a clean working tree.
    - Run `mvn -B package`.
    - Record the test count from `target/surefire-reports/TEST-*.xml`: sum `tests` minus `skipped`.
-   - Save `mvn dependency:tree` output to a scratch file **outside the repo**.
+   - Save `mvn dependency:tree` output to a scratch file under `target/` (build output, not committed; the IDE guard refuses writes outside the project). Do not run `mvn clean` before the comparison.
 2. **Tag the major upgrades** (steps 17, 19, 23). Propose `git tag pre-<step>` and create it only after the user confirms.
 3. **Bump exactly one thing.** When the plan says so, remove pins that Boot already manages (step 5: HikariCP, byte-buddy, objenesis).
 4. **App-impact checklist.**
    - Copy the step's *App impact* bullets from the plan into your plan and the PR description, then resolve each one.
    - For OpenRewrite steps (20, 23), use the recipe the plan names. The OpenRewrite Maven plugin is not in the pom, so ask before adding it.
-   - Confirm that `WebAppInitializer` and the test `WebAppConfigurationAware` still list matching config classes (CLAUDE.md).
+   - Confirm that the production bootstrap and the test `WebAppConfigurationAware` still list matching config classes (CLAUDE.md). The bootstrap is `WebAppInitializer` before plan step E1, and `BagDatabaseApplication` after it.
 5. **Compile and diff.**
    - Run `mvn -B -DskipTests package` and fix compile errors.
    - Re-run `mvn dependency:tree`. Look for unexpected transitive changes and for mixed `javax.*` and `jakarta.*` artifacts.
@@ -40,7 +42,6 @@ Phase 2 rule (`.claude/docs/refactoring-plan.md`): each step bumps **one** thing
    - Contract tests: see the **characterization-tests** skill.
    - From step 16 on, the PostGIS Testcontainers profile.
    - Smoke test with the relevant `docker/*/docker-compose.yml`, **only with user approval** (Docker pulls and runs). Step-specific checks:
-     - S3 compose for the AWS bump;
      - image and video endpoints for JDK and OpenCV bumps;
      - LDAP (`test_ldap` profile) for security changes.
    - From step 12 on, the Playwright smoke test.

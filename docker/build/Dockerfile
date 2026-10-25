@@ -1,4 +1,4 @@
-FROM maven:3.8.5-openjdk-11 as base-layer
+FROM maven:3.9-eclipse-temurin-11 as base-layer
 
 LABEL maintainer="david.anthony@swri.org"
 LABEL author="P.J. Reed"
@@ -12,11 +12,13 @@ RUN mvn -e -B dependency:resolve
 COPY src ./src
 RUN mvn -e -B package
 
-FROM tomcat:9-jdk11
+# The application runs on its embedded Tomcat: java -jar on the executable JAR
+FROM eclipse-temurin:11-jre
 
 LABEL maintainer="david.anthony@swri.org"
 LABEL author="P.J. Reed"
 
+# /usr/local/tomcat/logs is kept from the former tomcat:9 image so that existing log volumes keep working
 VOLUME ["/bags", "/root/.ros-bag-database/indexes", "/usr/local/tomcat/logs"]
 EXPOSE 8080
 
@@ -24,9 +26,11 @@ EXPOSE 8080
 RUN apt-get update \
     && apt-get install -y ffmpeg perl \
     && rm -rf /var/lib/apt/lists/*
-RUN rm -rf /usr/local/tomcat/webapps/
-COPY --from=base-layer /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
+
+# The working directory is Tomcat's base directory (server.tomcat.basedir=.), so bag_database.log and the
+# access log are written to /usr/local/tomcat/logs
+WORKDIR /usr/local/tomcat
+COPY --from=base-layer /app/target/*.jar /app/bag-database.jar
 COPY src/main/docker/entrypoint.sh /
-COPY src/main/docker/server.xml /usr/local/tomcat/conf/server.xml
 
 CMD ["/entrypoint.sh"]
