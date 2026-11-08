@@ -1,6 +1,6 @@
 // *****************************************************************************
 //
-// Copyright (c) 2015, Southwest Research Institute® (SwRI®)
+// Copyright (c) 2020, Southwest Research Institute® (SwRI®)
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -17,30 +17,49 @@
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL Southwest Research Institute® BE LIABLE 
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+// ARE DISCLAIMED. IN NO EVENT SHALL Southwest Research Institute® BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 // OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 //
 // *****************************************************************************
 
-package com.github.swrirobotics.config;
+package com.github.swrirobotics.account;
 
-import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer;
-import org.springframework.web.multipart.support.MultipartFilter;
+/**
+ * The account as sent to the web interface; never carries the password hash.
+ */
+public class AccountDto {
+    private final Long myId;
+    private final String myEmail;
+    private final String myRole;
 
-import javax.servlet.ServletContext;
+    private AccountDto(Long id, String email, String role) {
+        myId = id;
+        myEmail = email;
+        myRole = role;
+    }
 
-public class SecurityInitializer extends AbstractSecurityWebApplicationInitializer {
-    // This class is empty, but we need to extend an instance of
-    // AbstractSecurityWebApplicationInitializer in order to add Spring Session
-    // support to Spring Security.
-    @Override
-    protected void beforeSpringSecurityFilterChain(ServletContext servletContext) {
-        insertFilters(servletContext, new MultipartFilter());
+    public static AccountDto from(Account account) {
+        if (account == null) {
+            return null;
+        }
+        return new AccountDto(account.getId(), account.getEmail(), account.getRole());
+    }
+
+    public Long getId() {
+        return myId;
+    }
+
+    public String getEmail() {
+        return myEmail;
+    }
+
+    public String getRole() {
+        return myRole;
     }
 }

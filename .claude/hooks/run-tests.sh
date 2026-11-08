@@ -39,11 +39,30 @@ if ! mkdir "$lock" 2>/dev/null; then
 fi
 trap 'rmdir "$lock"' EXIT
 
+# Hooks run without the interactive shell profile, so JDK 11 and Maven (sdkman) are not on PATH.
+default_java_home="/c/Program Files/Java/jdk-11.0.32.1"
+if [ -z "${BAGDB_JAVA_HOME:-}" ] && [ -x "$default_java_home/bin/java" ]; then
+  BAGDB_JAVA_HOME="$default_java_home"
+fi
 if [ -n "${BAGDB_JAVA_HOME:-}" ]; then
   export JAVA_HOME="$BAGDB_JAVA_HOME"
   export PATH="$JAVA_HOME/bin:$PATH"
 fi
 java_major=$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)
+
+if ! command -v mvn >/dev/null 2>&1; then
+  for dir in "${MAVEN_HOME:-}" "${M2_HOME:-}" "$HOME/.sdkman/candidates/maven/current"; do
+    if [ -n "$dir" ] && [ -x "$dir/bin/mvn" ]; then
+      export PATH="$dir/bin:$PATH"
+      break
+    fi
+  done
+fi
+if ! command -v mvn >/dev/null 2>&1; then
+  # Environment problem, not a test failure: report it without blocking.
+  jq -n '{systemMessage: "run-tests hook: mvn not found on PATH (set MAVEN_HOME); tests not run."}'
+  exit 0
+fi
 
 log="$state_dir/mvn-test.log"
 # shellcheck disable=SC2086

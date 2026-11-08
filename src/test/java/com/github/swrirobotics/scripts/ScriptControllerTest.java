@@ -44,11 +44,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.payload.FieldDescriptor;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.*;
@@ -60,6 +62,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WithMockUser(roles = "ADMIN")
 public class ScriptControllerTest extends WebAppConfigurationAware {
     @MockBean
     ScriptService scriptService;
@@ -272,5 +275,60 @@ public class ScriptControllerTest extends WebAppConfigurationAware {
                 ).andWithPrefix("results[].", getScriptResultFields()
                 ))
             );
+    }
+
+    @Test
+    public void getScript() throws Exception {
+        ScriptDTO script = makeScript();
+        when(scriptService.getScript(0L)).thenReturn(script);
+        mockMvc.perform(get("/scripts/get")
+            .param("scriptId", "0"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.name").value("Test Script"))
+            .andDo(document("scripts/{method-name}",
+                preprocessRequest(prettyPrint()),
+                preprocessResponse(prettyPrint()),
+                requestParameters(
+                    parameterWithName("scriptId").description("Database ID of the script to retrieve")
+                ),
+                responseFields(
+                    fieldWithPath("success").description("Whether the script was found"),
+                    fieldWithPath("data").description("The script")
+                )
+                    .andWithPrefix("data.", getScriptFields())
+                    .andWithPrefix("data.criteria[].", getScriptCriteriaFields())
+            ));
+    }
+
+    @Test
+    public void getNonexistentScript() throws Exception {
+        when(scriptService.getScript(42L)).thenThrow(new NonexistentScriptException("Script 42 not found"));
+        mockMvc.perform(get("/scripts/get")
+            .param("scriptId", "42"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.data").value("Script 42 not found"))
+            .andDo(document("scripts/{method-name}",
+                preprocessResponse(prettyPrint()),
+                responseFields(
+                    fieldWithPath("success").description("False when the script does not exist"),
+                    fieldWithPath("data").description("Error message explaining why the script could not be retrieved")
+                )
+            ));
+    }
+
+    @Test
+    public void deleteScript() throws Exception {
+        mockMvc.perform(post("/scripts/delete")
+            .param("scriptId", "1")
+            .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(content().string(""))
+            .andDo(document("scripts/{method-name}"));
+
+        verify(scriptService).removeScript(1L);
     }
 }

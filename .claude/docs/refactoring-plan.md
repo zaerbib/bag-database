@@ -2,6 +2,8 @@
 
 > Derived from [`audit.md`](audit.md). Target order: **(0) safety net → (1) separate front end and back end → (2) upgrade one major version at a time → (3) rewrite hot paths for performance with identical behavior.**
 
+> **Step numbering:** steps E1–E6 (embedded Tomcat, removal of the external Tomcat, JAR packaging, auto-configuration) were added after the plan was written. They use an `E` prefix so that the existing step numbers, which skills and `/next-step` refer to, stay stable. Follow the document order and the dependency map, not the numbers.
+
 > **Progress tracking:** `[ ]` = not done, `[x]` = done.
 > - Check a step only once its *Test* passes.
 > - Steps split into separate PRs (4a–4d, 22, 26) have one box per PR; check the parent step when all its boxes are checked.
@@ -22,45 +24,210 @@
 
 ---
 
-## [ ] Phase 0 — Safety net (before touching structure)
+## [x] Phase 0 — Safety net (before touching structure)
 
 These steps come first because the plan cannot be validated without tests, and because the audit found exploitable issues that must not survive the refactoring.
 
-- [ ] **1. Restore `BagService` search predicates.**
+- [x] **1. Restore `BagService` search predicates.**
   - Revert the uncommitted `String.valueOf(root.get(...))` change and go back to the metamodel (`Bag_.messageTypes`, `MessageType_.name`, `Tag_.tag`, `Tag_.value`, `Topic_.topicName`).
   - Keep `System.lineSeparator()`.
   - *Test:* new `BagServiceTest` case that searches on `messageType`, `tags` and `topicName`.
   - *Rollback:* `git revert`.
 
-- [ ] **2. Measure coverage.**
+- [x] **2. Measure coverage.**
   - Add `jacoco-maven-plugin` (report only, no threshold yet).
   - Upgrade CI to `actions/checkout@v4` and `actions/setup-java@v4` (Temurin 11).
   - *Test:* CI publishes `target/site/jacoco`.
   - *Rollback:* remove the plugin.
 
-- [ ] **3. API contract (characterization) tests.**
+- [x] **3. API contract (characterization) tests.**
   - For every endpoint called by the front end (`bags/*`, `scripts/*`, `status/*`, `admin/*`, `config/get`, `account/current`), add MockMvc tests that pin the JSON shape: `success`, `data`, `totalCount`, field names.
   - *Test:* the tests themselves; they become the regression baseline for all later steps.
   - *Rollback:* not needed (tests only).
 
-- [ ] **4. Close the critical security holes. Each item is a separate PR.**
-  - [ ] 4a. Enable method security (`@EnableGlobalMethodSecurity(securedEnabled = true)`). Require `ROLE_ADMIN` on `scripts/save|run|delete`, and authentication on `bags/update|upload|setTag|setTagForBags|removeTags`.
-  - [ ] 4b. Stop serializing secrets: `jdbcPassword`, `adminPassword`, `ldapBindPassword`, API keys.
+- [x] **4. Close the critical security holes. Each item is a separate PR.**
+  - [x] 4a. Enable method security (`@EnableGlobalMethodSecurity(securedEnabled = true)`). Require `ROLE_ADMIN` on `scripts/save|run|delete`, and authentication on `bags/update|upload|setTag|setTagForBags|removeTags`.
+  - [x] 4b. Stop serializing secrets: `jdbcPassword`, `adminPassword`, `ldapBindPassword`, API keys.
     - `config/get` returns a DTO without them.
     - Saving keeps the existing value when the field is empty.
     - `account/current` returns a DTO, not the `Account` entity.
-  - [ ] 4c. Upload path validation: resolve against `basePath`, reject if the result does not `startsWith(basePath)`, and sanitize `getOriginalFilename()`.
-  - [ ] 4d. Allow-list the field names accepted by search and `ExtJsFilter` before calling `root.get(field)`.
+  - [x] 4c. Upload path validation: resolve against `basePath`, reject if the result does not `startsWith(basePath)`, and sanitize `getOriginalFilename()`.
+    - Also add a URL-level `authenticated()` rule for `POST /bags/upload` (and the other write endpoints) before the `/bags/**` `permitAll`: the method-level check from 4a only runs after the multipart body has been fully received.
+  - [x] 4d. Allow-list the field names accepted by search and `ExtJsFilter` before calling `root.get(field)`.
   - *Test:* `WebSecurityConfigurationAware` tests that check anonymous → 401/403 and admin → 200, plus a traversal test with `../../etc`.
   - *Rollback:* revert the individual PR.
 
-- [ ] **5. Dependency hygiene (no version jumps).**
+- [x] **5. Dependency hygiene (no version jumps).**
   - Remove `ldapsdk`, `javax.transaction:jta`, `tomcat-el-api` / `tomcat-embed-el` 8.5, and the forced versions of `byte-buddy`, `HikariCP` and `objenesis` (let Boot manage them).
   - Move `h2`, `h2gis-*` and `org.osgi.service.jdbc` to `test` scope.
     - Make `JpaConfig` fail fast instead of silently falling back to H2 in production.
   - Delete the unused `bootstrap.min.js`.
   - *Test:* full test suite, plus a Docker compose smoke test (app starts, bags are listed).
   - *Rollback:* revert the `pom.xml` diff.
+
+---
+
+## [x] Phase 0b — Remove Tomcat: run as a Spring Boot application with its embedded Tomcat (still on the current stack)
+
+**Goal: there is no Tomcat to install, and nothing is deployed into a Tomcat.**
+- The application is a Spring Boot application started with `java -jar bag-database.jar`. Spring Boot brings its own embedded Tomcat; its version is managed by Spring Boot.
+- The build produces an executable **JAR**. No WAR file is built, and deploying into an external Tomcat (`webapps/ROOT.war`, `server.xml`, `catalina.sh`) is no longer supported.
+- The Docker image is a plain JRE image (`eclipse-temurin`) running `java -jar`. Outside Docker, the only requirements are a JDK and PostGIS.
+- See [`audit.md` §8](audit.md#8-runtime-and-deployment).
+
+**Where we stand (2026-10-25):** Phase 0b is complete. E1–E3 put the embedded Tomcat in place and moved the Docker image off `tomcat:9`; E5 removed the external-Tomcat mode and E6 switched the packaging to an executable JAR. The S3 storage backend was also removed during this phase, by decision, in its own commit.
+
+**Chosen approach: embedded Tomcat with the explicit configuration first, Boot auto-configuration later.**
+- **Embedded Tomcat now, Boot auto-configuration later (step E4).**
+  - The application wires DataSource, JPA, Liquibase, Spring Session 1.3.5, Thymeleaf, MVC (`@EnableWebMvc`) and Security by hand.
+  - Enabling `@SpringBootApplication` in one go would make Boot's auto-configurations compete with those beans: a second Liquibase run, a second DataSource or Thymeleaf resolver, and a `SessionAutoConfiguration` written for Spring Session 2.x.
+  - So E1 imports **only** the auto-configurations needed to run the embedded server, and behavior stays identical.
+  - E4 then hands each subsystem to Boot in its own PR, once its prerequisites (steps 16, 17, 19) are done. Running without an external Tomcat does **not** depend on E4.
+- **Transition first (E1–E3), then remove Tomcat (E5, E6).**
+  - E1–E3 kept the WAR deployable into an external Tomcat so that each step could be rolled back on its own.
+  - E5 drops the external-Tomcat mode: no `SpringBootServletInitializer`, and the Tomcat jars become normal dependencies instead of `provided` ones. This also fixes running the application from the IDE.
+  - E6 moves the Thymeleaf views, i18n messages and static files from `src/main/webapp` (servlet-context resources, which only exist in a WAR) to the classpath, and switches the packaging to `jar`. This used to be the optional step 27 at the end of the plan; it now happens here, without waiting for step 13.
+- **Why before Phase 1:**
+  - The Phase 1 deliverables (the front-end build in step 12, the split compose in step 14, the Playwright smoke tests) should target the final runtime.
+  - The Boot 3 upgrade (step 23) then brings Tomcat 10.1 automatically, with no base-image migration.
+- **Why after Phase 0:**
+  - E1 re-registers the security, session and multipart filters, so the access-control tests from step 4 (including 4c's upload rule) must already exist.
+  - Step 5 removes the `tomcat-el` 8.5 pins, which would clash with the embedded Tomcat 9.
+
+- [x] **E1. One Spring Boot bootstrap, two launch modes.** *(The second launch mode, deployment into an external Tomcat, was a transition only; E5 removes it.)*
+  - Add `BagDatabaseApplication`:
+    - annotated `@SpringBootConfiguration`, with `@Import` of the six config classes;
+    - `@ImportAutoConfiguration` limited to `ServletWebServerFactoryAutoConfiguration`, `DispatcherServletAutoConfiguration` and `WebSocketServletAutoConfiguration`;
+    - extends `SpringBootServletInitializer` and has a `main` method.
+  - Replace the three `WebApplicationInitializer`s (`WebAppInitializer`, `SecurityInitializer`, `SpringSessionInitializer`), which Boot does **not** call in embedded mode, with registration beans.
+    - Keep today's filter order: `CharacterEncodingFilter` (UTF-8, forced) → `springSessionRepositoryFilter` → `MultipartFilter` → `springSecurityFilterChain` → `DispatcherServlet`.
+    - The `DispatcherServlet` keeps its mapping `/`, `defaultHtmlEscape=true` and the 50 GB `MultipartConfigElement`.
+    - Boot registers every `Filter` bean on `/*` automatically. List them, and disable (`FilterRegistrationBean.setEnabled(false)`) any that must not be mapped twice.
+  - Replace the `<error-page>` in `web.xml` with an `ErrorPageRegistrar` (→ `/generalError`), then delete `web.xml`.
+  - Replace the `spring.profiles.active=default` init parameter with `spring.profiles.default=default`.
+  - Merge the root and servlet contexts into one.
+    - Today `WebMvcConfig` is loaded in **both**, so controllers and `@PostConstruct` hooks such as `AdminController.checkAdminAccount` run twice.
+    - After the merge they run once. Name this behavior change in the PR.
+  - `pom.xml`:
+    - add `spring-boot-maven-plugin` (`repackage`);
+    - change `spring-boot-starter-tomcat` to `provided`, so it moves to `WEB-INF/lib-provided` and an external Tomcat does not load a second Tomcat;
+    - remove `tomcat7-maven-plugin`.
+  - `WebAppConfigurationAware` lists the new application class instead of the six config classes.
+  - The Docker image is unchanged in this step (still `tomcat:9` + `ROOT.war`). Only the bootstrap changes.
+  - *Test:*
+    - The full suite, the contract tests and the access-control tests pass unchanged.
+    - A new `@SpringBootTest(webEnvironment = RANDOM_PORT)` smoke test on the `test` profile checks that:
+      - `/` and a `/resources/**` file are served;
+      - `/register/info` (SockJS) answers;
+      - an unknown URL renders the general error page;
+      - the session is created by Spring Session (JDBC);
+      - an anonymous `POST /bags/upload` is refused.
+    - A filter-order assertion: session, then multipart, then security.
+    - A Docker compose smoke test on the unchanged `tomcat:9` image proves the external-Tomcat mode still works.
+  - *Results (2026-10-22):*
+    - [x] Full suite, contract and access-control tests unchanged; `EmbeddedServerTest` (embedded smoke test and filter order) passes. Re-verified 2026-10-22 on the Phase 0b run: 123 tests, 0 failures (`EmbeddedServerTest` 8, `AccessControlTest` 13).
+    - [x] External-Tomcat smoke test on `tomcat:9`: not run, and no longer needed. External-Tomcat deployment is removed in E5.
+  - *Rollback:* revert the PR; the three initializers and `web.xml` come back.
+
+- [x] **E2. Tomcat settings as Spring Boot properties.**
+  - Move what `src/main/docker/server.xml` configures into `application.properties`:
+    - `server.port=8080`;
+    - `server.tomcat.threads.max=150`, `server.tomcat.threads.min-spare=25`;
+    - `server.tomcat.connection-timeout=20s`;
+    - `server.compression.enabled=true`, `min-response-size=2KB` and the same MIME types;
+    - `server.tomcat.accesslog.*` with the same pattern, `%h %l %u %t "%r" %s %b`.
+  - Large uploads: set `server.tomcat.max-swallow-size=-1` and check `max-http-form-post-size`, so that 50 GB multipart uploads behave as they do today.
+  - Add `server.shutdown=graceful`, so that `docker stop` lets running requests finish.
+  - `LockOutRealm` / `UserDatabaseRealm` and the shutdown port are not carried over; the application does its own authentication.
+  - *Test:*
+    - An integration test on the embedded server checks that:
+      - a JSON response larger than 2 KB is gzip-encoded;
+      - the access log is written;
+      - a multipart upload larger than Tomcat's 2 MB form limit succeeds.
+    - Manual run of `java -jar target/bag-database-<version>.war` against a local PostGIS.
+  - *Results (2026-10-22, Phase 0b run):*
+    - [x] `EmbeddedServerSettingsTest` (gzip, access log, upload over 2 MB) passes, 5 tests.
+    - [x] `java -jar` against PostGIS: run through the image's entrypoint (`exec java -jar`, `settings.yml` generated from the environment) against a throwaway `postgis/postgis:11-2.5`, because a hand-written `settings.yml` is refused by the credential-file hook. Started in 52 s; `/`, `/resources/**`, `bags/search`, SockJS info and the WebSocket upgrade (101) answer; responses are gzip-encoded; access log written.
+  - *Rollback:* remove the properties. The embedded defaults apply again.
+
+- [x] **E3. The Docker image runs the embedded server.** *(Checked by decision: the webviz smoke test and the sample-bag checks were not run, see Results.)*
+  - Tag `pre-E3` first.
+  - `docker/build/Dockerfile`:
+    - the build stage becomes `maven:3.9-eclipse-temurin-11`;
+    - the runtime image becomes `eclipse-temurin:11-jre` plus `ffmpeg` and `perl`;
+    - the WAR is copied to `/app/bag-database.war`.
+  - `entrypoint.sh` ends with `exec java $JAVA_OPTS -jar /app/bag-database.war`. The `exec` lets the JVM receive `SIGTERM`.
+    - `BAGDB_PATH`, which today renames `ROOT.war`, becomes `--server.servlet.context-path=/${BAGDB_PATH}`.
+    - Keep `/usr/local/tomcat/logs` as the access-log directory, or document the new path, so that existing volumes keep working.
+  - Delete `src/main/docker/server.xml`.
+  - Update every `docker/*/docker-compose.yml`, `docs/installation/docker/*` and the README. `docs/installation/tomcat.md` stays until E5 removes external-Tomcat deployment.
+  - *Test:*
+    - A compose smoke test for each example (no auth, LDAP, reverse proxy with a context path, webviz) checks that:
+      - the application starts and bags are listed;
+      - upload works;
+      - the status WebSocket connects;
+      - image and video endpoints work (OpenCV native loading from the executable WAR).
+    - `docker stop` shuts down gracefully.
+    - Compare the image size with the old one.
+  - *Results (2026-10-22, examples reproduced with `docker run` against the locally built image):*
+    - [x] No auth: starts, OpenCV loads, bags listed, SockJS info and WebSocket upgrade (101), logs in `/usr/local/tomcat/logs`. Re-run on the Phase 0b run with a fresh build of the same code.
+    - [x] LDAP: anonymous requests redirected to `/ldap_login`, wrong password refused, LDAP user `jdoe` logs in (form + CSRF), bags listed.
+    - [x] Reverse proxy (Traefik, `BAGDB_PATH=bagdb`): `/bagdb/` served through the proxy, bags listed, WebSocket upgrade (101) through the proxy, `/` is 404. `BAGDB_PATH=a#b/` serves `/a/b`.
+    - [x] S3: dropped from the test by decision. S3 storage is not used for now and was removed from the code base in a separate commit after E3.
+    - [ ] Webviz: not run, accepted by decision. The IDE guard refused the Docker socket mount for Traefik and reading `docker/webviz/*.env` (credentials). Its TLS/ACME setup also needs a public host name.
+    - [ ] Upload, image and video endpoints: skipped by decision (no sample `.bag` in the repository).
+    - [x] `docker stop`: graceful shutdown completed in 1 s.
+    - [x] Image size: 1.86 GB (was 2.16 GB on `tomcat:9-jdk11`).
+  - *Rollback:* redeploy the `pre-E3` image; reverting the Dockerfile brings back `tomcat:9`.
+
+- [x] **E5. Remove external-Tomcat deployment: Spring Boot's embedded Tomcat is the only runtime.**
+  - **Contract change** (name it in the commit and the CHANGELOG): the WAR can no longer be deployed into an external Tomcat. Supported ways to run: `java -jar` and the Docker image.
+  - `BagDatabaseApplication` no longer extends `SpringBootServletInitializer`; it keeps only `main`. Nothing else implements `WebApplicationInitializer`.
+  - `pom.xml`:
+    - `spring-boot-starter-tomcat` goes back to the default (`compile`) scope. The Tomcat jars move from `WEB-INF/lib-provided` to `WEB-INF/lib`.
+    - Remove the explicit `javax.servlet-api` (`provided`) dependency; `tomcat-embed-core` provides the Servlet API.
+    - Result: running `BagDatabaseApplication` from the IDE works with a plain run configuration (today it fails with `ClassNotFoundException: javax.servlet.Filter` unless provided-scope dependencies are added to the classpath).
+  - Remove what only existed for an external Tomcat:
+    - `logback.xml`: write `bag_database.log` to `logs/` under the working directory instead of `${catalina.base:-.}/logs` (same location in Docker, where the working directory is `/usr/local/tomcat`).
+    - The CHANGELOG note about Boot's `ErrorPageFilter` in external-Tomcat mode no longer applies; the error page is always the embedded Tomcat's.
+  - Documentation:
+    - Replace `docs/installation/tomcat.md` with `docs/installation/standalone.md`: run without Docker with a JDK 11, PostGIS, `~/.ros-bag-database/settings.yml` and `java -jar`, plus a `systemd` unit example. Settings that used to live in Tomcat's `server.xml` / `setenv.sh` are `server.*` properties or `JAVA_OPTS`.
+    - Remove every remaining "external Tomcat" mention from `CLAUDE.md`, the README, `docs/` and the skills (`java-upgrade` documents `CATALINA_OPTS` for external Tomcat installations).
+    - The CHANGELOG states the removal and points to `standalone.md`.
+  - *Test:*
+    - Full suite, contract and access-control tests; `EmbeddedServerTest` and `EmbeddedServerSettingsTest`.
+    - `mvn dependency:tree` shows no `provided` Tomcat or Servlet API artifact; the WAR has no `WEB-INF/lib-provided`.
+    - The application starts from a plain IDE run configuration (no provided-scope option).
+    - Docker no-auth smoke test: starts, bags listed, logs in `/usr/local/tomcat/logs`.
+  - *Results (2026-10-25, Phase 0b run):*
+    - [x] Full suite green, 123 tests; `EmbeddedServerTest` and `EmbeddedServerSettingsTest` pass.
+    - [x] `dependency:tree`: `spring-boot-starter-tomcat` and the `tomcat-embed-*` jars are `compile` (through `spring-boot-starter-web`); `javax.servlet-api` only appears transitively in `test` scope. The WAR has no `WEB-INF/lib-provided`.
+    - [x] Plain run configuration: `BagDatabaseApplication` launched with only the compile+runtime classpath (`dependency:build-classpath -Dmdep.includeScope=runtime`, what an IDE uses without "include provided"). No `ClassNotFoundException`; the context gets to opening the DataSource (it failed there only because no `settings.yml` pointed it at a PostGIS).
+    - [x] Docker no-auth smoke test against a throwaway PostGIS: starts, OpenCV loads, `/`, `/resources/**`, the login page and `bags/search` answer, SockJS info and WebSocket upgrade (101), anonymous upload refused (401), `bag_database.log` and the access log in `/usr/local/tomcat/logs`, `docker stop` in 2 s. Image 1.85 GB.
+  - *Rollback:* revert the PR; the external-Tomcat mode of E1 comes back.
+
+- [x] **E6. Executable JAR: no more WAR packaging.**
+  - Prerequisite: E5. This step does **not** wait for step 13 or E4: the Thymeleaf views are moved to the classpath, not removed.
+  - Move the content of `src/main/webapp` to the classpath (`git mv`, no content change):
+    - `WEB-INF/views/` → `src/main/resources/templates/`; in `WebMvcConfig`, the template resolver prefix becomes `classpath:/templates/`.
+    - `WEB-INF/i18n/` → `src/main/resources/i18n/`; the message source basename becomes `classpath:/i18n/messages`.
+    - `resources/` (css, fonts, images, js) → `src/main/resources/static/resources/`; the resource handler location becomes `classpath:/static/resources/`. URLs stay `/resources/**`, so templates, JavaScript and `SecurityConfig` are unchanged.
+  - `WebMvcConfig.configureDefaultServletHandling()` and `server.servlet.register-default-servlet` were only needed to serve the servlet document root, which no longer exists. Remove both, after checking with the smoke test that no URL relied on the default servlet.
+  - `pom.xml`:
+    - `<packaging>jar</packaging>`; the build produces `target/bag-database-<version>.jar`.
+    - `yuicompressor-maven-plugin`: write `compressed.js` to `${project.build.outputDirectory}/static/resources/js/` instead of the WAR staging directory.
+    - `maven-resources-plugin` (REST docs): copy `generated-docs` to `${project.build.outputDirectory}/static/resources/docs`, so the API docs stay at `/resources/docs/`. Both must run before the `jar` goal.
+  - Docker: `Dockerfile` copies `target/*.jar` to `/app/bag-database.jar`; `entrypoint.sh` runs `exec java $JAVA_OPTS -jar /app/bag-database.jar`. Update `CLAUDE.md`, `docs/installation/standalone.md` and the skills that mention the WAR.
+  - Phase 1 impact: step 12 builds the front end into `classpath:/static` instead of the WAR (its text is updated accordingly).
+  - *Test:*
+    - Full suite; `EmbeddedServerTest` still serves `/`, `/resources/**` and the error page, now from the classpath.
+    - A test that `/resources/js/compressed.js` and `/resources/docs/index.html` are served from the packaged JAR (or a check of the JAR listing in CI).
+    - `java -jar target/bag-database-<version>.jar` against PostGIS; Docker no-auth smoke test, including a page with i18n messages (the login page) and `DEBUG_JAVASCRIPT=false` (compressed JavaScript).
+  - *Results (2026-10-25, Phase 0b run):*
+    - [x] Full suite green, 126 tests. `EmbeddedServerTest` serves `/`, `/resources/**` and the error page from the classpath, and gains three tests: `compressed.js` is served, templates resolve i18n messages, no default servlet is registered.
+    - [x] JAR listing: `BOOT-INF/classes/static/resources/js/compressed.js`, `static/resources/docs/index.html`, `templates/`, `i18n/messages.properties`; no `WEB-INF`. Only `application-min.js` is left uncombined, as in the former WAR.
+    - [x] `java -jar` on the JAR against a throwaway PostGIS, through the Docker image (`/app/bag-database.jar`, `DEBUG_JAVASCRIPT=false`): starts in 40 s, OpenCV loads from `BOOT-INF/lib`; `/` and the login page render the i18n title and load `compressed.js`; `/resources/**`, `/favicon.ico` and `/resources/docs/index.html` answer 200; `bags/search`, SockJS info and the WebSocket upgrade (101) work; an unknown URL gets the general error page (404); anonymous upload is refused (401); logs in `/usr/local/tomcat/logs`; `docker stop` is graceful in 2 s. Image 1.85 GB.
+  - *Rollback:* revert the PR; `war` packaging and `src/main/webapp` come back.
 
 ---
 
@@ -113,8 +280,8 @@ Goal: the ExtJS application becomes a set of static files that talk to a JSON AP
   - Replace `yuicompressor-maven-plugin` with a small Node build (`frontend/package.json`, using `terser` to concatenate and minify).
     - The file order moves from `pom.xml` to `frontend/build-order.json`.
     - Bundle file names are content-hashed.
-  - Use `frontend-maven-plugin` so that `mvn package` still builds the front end and copies it into the WAR. Deployment is unchanged.
-  - *Test:* the WAR serves `/index.html`; a Playwright smoke test (login, search, open bag details, map) is added to CI.
+  - Use `frontend-maven-plugin` so that `mvn package` still builds the front end and copies it into the application JAR (`classpath:/static`, see E6). Deployment is unchanged.
+  - *Test:* the application serves `/index.html`; a Playwright smoke test (login, search, open bag details, map) is added to CI.
   - *Rollback:* restore the yuicompressor block and serve `home.html` (still present).
 
 - [ ] **13. Remove server-side rendering.**
@@ -127,9 +294,9 @@ Goal: the ExtJS application becomes a set of static files that talk to a JSON AP
 - [ ] **14. Independent deployment.**
   - Add `docker/split/docker-compose.yml`:
     - an `nginx` container serving `frontend/dist` with long-lived `Cache-Control: immutable` on hashed files and gzip/brotli;
-    - a reverse proxy for `/api` and `/api/ws` to Tomcat.
+    - a reverse proxy for `/api` and `/api/ws` to the back end (embedded Tomcat since E3).
   - The back end gets CORS and cookie `SameSite` settings for a separate origin during development (`npm run dev` against a local API).
-  - The existing all-in-one WAR image stays available.
+  - The existing all-in-one image (front end served by the Spring Boot application) stays available.
   - *Test:* the Playwright smoke test runs against the split compose.
   - *Rollback:* use the all-in-one image.
 
@@ -161,7 +328,7 @@ Each step bumps **one** thing. Each step runs the full suite, the contract tests
   - *Rollback:* tag `pre-17`; the changelog rollback restores the 1.x tables.
 
 - [ ] **18. Java 11 → 17.**
-  - Compiler `release 17`, Docker build `maven:3.9-eclipse-temurin-17`, runtime `tomcat:9-jdk17-temurin`, CI on Temurin 17.
+  - Compiler `release 17`, Docker build `maven:3.9-eclipse-temurin-17`, runtime `eclipse-temurin:17-jre` (embedded Tomcat since E3), CI on Temurin 17.
   - *App impact:* check OpenCV native loading and the `--add-opens` flags needed by older libraries.
   - *Test:* full suite; image and video endpoints (OpenCV/ffmpeg).
   - *Rollback:* revert the images and compiler flag.
@@ -171,6 +338,29 @@ Each step bumps **one** thing. Each step runs the full suite, the contract tests
   - *App impact:* rewrite `SecurityConfig` from `WebSecurityConfigurerAdapter` to a `SecurityFilterChain` bean, and switch to `@EnableMethodSecurity`. This is the Security 6 style, but on 5.7.
   - *Test:* the security tests from step 4 plus the LDAP tests.
   - *Rollback:* tag `pre-19`.
+
+- [ ] **E4. Hand the infrastructure over to Spring Boot auto-configuration (one PR per subsystem).**
+  - Goal: replace the hand-built infrastructure beans with Boot auto-configuration and `spring.*` properties. `settings.yml` stays the user-facing configuration file.
+  - Prerequisites: E1 (Boot bootstrap), 16 (PostGIS tests), 17 (Spring Session 2.x) and 19 (`SecurityFilterChain`).
+  - [ ] DataSource, Hikari and JPA.
+    - An `EnvironmentPostProcessor` maps `settings.yml` (`driver`, `jdbcUrl`, `jdbcUsername`, `jdbcPassword`) to `spring.datasource.*`.
+    - The hand-built DataSource and `EntityManagerFactory` in `JpaConfig` give way to `DataSourceAutoConfiguration` and `HibernateJpaAutoConfiguration` (`spring.jpa.*`, Hibernate Spatial dialect).
+  - [ ] Liquibase.
+    - Use `spring.liquibase.change-log`, and delete `LiquibaseConfig`.
+    - The changelog path and ids must stay identical, so that `DATABASECHANGELOG` is not re-run.
+  - [ ] Spring Session: `spring.session.store-type=jdbc`; remove `@EnableJdbcHttpSession` and the manual filter registration from E1.
+  - [ ] Executors and scheduling.
+    - Use `spring.task.execution.*` / `spring.task.scheduling.*` instead of `mvcTaskExecutor`.
+    - Keep the 1 h async timeout (`spring.mvc.async.request-timeout`).
+  - [ ] Switch the application class to `@SpringBootApplication`.
+    - What stays hand-configured remains explicit beans: Security (`SecurityFilterChain` from step 19), the WebSocket broker, and MVC (`@EnableWebMvc` makes `WebMvcAutoConfiguration` back off until the front end no longer depends on it).
+    - Every auto-configuration that would still conflict is listed in `exclude`, with a comment saying why.
+  - Thymeleaf is not migrated, because step 13 removes it.
+  - *Test:*
+    - Each sub-step runs the full suite on H2 and PostGIS, the contract tests and the E1 smoke test.
+    - The `--debug` condition report is reviewed for unexpected matches.
+    - Startup logs no bean-definition overriding.
+  - *Rollback:* revert the single sub-step PR.
 
 - [ ] **20. JUnit 4 → JUnit 5.**
   - Use the OpenRewrite recipe `org.openrewrite.java.testing.junit5.JUnit4to5Migration`.
@@ -187,17 +377,17 @@ Each step bumps **one** thing. Each step runs the full suite, the contract tests
   - *Rollback:* switch the setting back.
 
 - [ ] **22. Minor upgrades of isolated libraries (one PR each):**
-  - [ ] AWS SDK 2.17 → latest 2.x
+  - [x] AWS SDK 2.17 → latest 2.x: no longer needed, the S3 storage backend and the AWS SDK were removed during Phase 0b.
   - [ ] OpenCV 4.5 → latest 4.x
   - [ ] `google-maps-services` latest
   - [ ] `yamlbeans` latest
   - [ ] `commons-*` latest
-  - *Test:* full suite; manual S3 smoke test with the S3 docker-compose example.
+  - *Test:* full suite.
   - *Rollback:* revert the single bump.
 
 - [ ] **23. Spring Boot 2.7 → 3.0 (Spring 6, Security 6, Hibernate 6.1, Jakarta EE 9).**
   - Run the OpenRewrite recipe `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0` (it handles `javax.*` → `jakarta.*`).
-  - Runtime moves to Tomcat 10.1, and the Docker base image becomes `tomcat:10.1-jdk17-temurin`.
+  - The embedded Tomcat moves to 10.1 with Boot 3. There is no base-image change and no Tomcat to upgrade separately (no external Tomcat since E5).
   - *App impact:*
     - Hibernate Spatial 6: dialects are auto-detected, so remove the `System.setProperty("hibernate.dialect", ...)` in `JpaConfig`.
     - Check `BagPosition` geometry mappings and HQL/Criteria queries (the stricter Hibernate 6 query parser).
@@ -229,10 +419,8 @@ Each step bumps **one** thing. Each step runs the full suite, the contract tests
   - *Test:* the Playwright smoke test after each library.
   - *Rollback:* restore the vendored file.
 
-- [ ] **27. Optional: executable JAR.**
-  - Package as a Spring Boot executable JAR with embedded Tomcat, use real Boot auto-configuration where possible, and remove `WebAppInitializer` and `web.xml`.
-  - *Test:* the same smoke tests against `java -jar`.
-  - *Rollback:* keep `war` packaging (both can coexist via a Maven profile during the transition).
+- [ ] **27. Superseded by E5 and E6.**
+  - The external-Tomcat support ends in E5 and the JAR packaging is done in E6, in Phase 0b. Nothing is left to do here: check this box once E6 is checked.
 
 ---
 
@@ -322,11 +510,14 @@ The step is accepted only if the measurement improves, and is reverted otherwise
 ## Dependency map (what must happen before what)
 
 ```
-1–5 ──► 6–15 (front/back split) ──► 16 ──► 17 ──► 18 ──► 19 ──► 20 ──► 21–22 ──► 23 ──► 24 ──► 25 ──► 26–27
-                                     │
-                                     └──► 28 ──► 29 ──► 30–38 (performance, interleavable) ──► 39
+1–5 ──► E1 ──► E2 ──► E3 ──► E5 ──► E6 ──► 6–15 (front/back split) ──► 16 ──► 17 ──► 18 ──► 19 ──► E4 ──► 20 ──► 21–22 ──► 23 ──► 24 ──► 25 ──► 26
+                                                                        │
+                                                                        └──► 28 ──► 29 ──► 30–38 (performance, interleavable) ──► 39
 ```
 
 - Step 4 (security) blocks everything else.
+- E1 needs steps 4 and 5: it re-registers the security, session and multipart filters, and step 5 removes the `tomcat-el` 8.5 pins.
+- E5 needs E3 (the Docker image no longer uses an external Tomcat). E6 needs E5. Phase 1 starts after E6, so that the front-end build (step 12) targets the JAR.
+- E4 needs steps 16, 17 and 19. Step 27 is superseded by E5 and E6.
 - Step 16 (PostGIS tests) blocks every upgrade and every performance step that touches SQL.
 - Step 21 (new Docker client) blocks step 35 (event-driven scripts).

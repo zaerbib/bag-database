@@ -40,8 +40,6 @@ import com.github.swrirobotics.bags.reader.records.Connection;
 import com.github.swrirobotics.bags.storage.*;
 import com.github.swrirobotics.bags.storage.filesystem.FilesystemBagStorageConfigImpl;
 import com.github.swrirobotics.bags.storage.filesystem.FilesystemBagStorageImpl;
-import com.github.swrirobotics.bags.storage.s3.S3BagStorageConfigImpl;
-import com.github.swrirobotics.bags.storage.s3.S3BagStorageImpl;
 import com.github.swrirobotics.config.ConfigService;
 import com.github.swrirobotics.persistence.MessageType;
 import com.github.swrirobotics.persistence.*;
@@ -175,11 +173,6 @@ public class BagService extends StatusProvider {
                 if (config instanceof FilesystemBagStorageConfigImpl) {
                     myLogger.info("Creating FilesystemBagStorageImpl.");
                     storage = applicationContext.getBean(FilesystemBagStorageImpl.class);
-                    storage.setBagService(this);
-                }
-                else if (config instanceof S3BagStorageConfigImpl) {
-                    myLogger.info("Creating S3BagStorageImpl.");
-                    storage = applicationContext.getBean(S3BagStorageImpl.class);
                     storage.setBagService(this);
                 }
                 else {
@@ -1043,6 +1036,25 @@ public class BagService extends StatusProvider {
         storage.uploadBag(file, targetDirectory);
     }
 
+    // Field names accepted from clients by findBagsContainingText.  Anything else is
+    // rejected before it reaches the Criteria API or Spring Data's Sort.
+    // Text search: the checkboxes in SearchPanel.js.
+    private static final Set<String> SEARCHABLE_TEXT_FIELDS = Set.of(
+            "filename", "description", "tags", "path", "location", "vehicle",
+            "messageType", "topicName");
+    // Grid filters and sorting: the filterable / sortable columns in BagGrid.js.
+    private static final Set<String> FILTERABLE_FIELDS = Set.of(
+            "id", "storageId", "path", "filename", "location", "vehicle", "description",
+            "latitudeDeg", "longitudeDeg", "missing", "md5sum", "duration", "createdOn",
+            "updatedOn", "startTime", "endTime", "size", "messageCount");
+    private static final Set<String> SORTABLE_FIELDS = FILTERABLE_FIELDS;
+
+    private static void requireAllowed(Set<String> allowed, String field, String kind) {
+        if (field == null || !allowed.contains(field)) {
+            throw new IllegalArgumentException("Unsupported " + kind + " field: " + field);
+        }
+    }
+
     private Pageable createPageRequest(int page, int size, String dir, String sort) {
         // ExtJS starts counting pages at 1, but Spring Data JPA starts counting at 0.
         return PageRequest.of(page-1,
@@ -1117,17 +1129,17 @@ public class BagService extends StatusProvider {
         for (String field : fields) {
             switch(field) {
                 case "messageType":
-                    Join<Bag, MessageType> mtJoin = root.join(String.valueOf(root.get("messageTypes")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(mtJoin.get(String.valueOf(root.get("name")))), wildcardText));
+                    Join<Bag, MessageType> mtJoin = root.join(Bag_.messageTypes, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(mtJoin.get(MessageType_.name)), wildcardText));
                     break;
                 case "tags":
-                    Join<Bag, Tag> tagJoin = root.join(String.valueOf(root.get("tags")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(tagJoin.get(String.valueOf(root.get("tag")))), wildcardText));
-                    preds.add(cb.like(cb.lower(tagJoin.get(String.valueOf(root.get("value")))), wildcardText));
+                    Join<Bag, Tag> tagJoin = root.join(Bag_.tags, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(tagJoin.get(Tag_.tag)), wildcardText));
+                    preds.add(cb.like(cb.lower(tagJoin.get(Tag_.value)), wildcardText));
                     break;
                 case "topicName":
-                    Join<Bag, Topic> topicJoin = root.join(String.valueOf(root.get("topics")), JoinType.LEFT);
-                    preds.add(cb.like(cb.lower(topicJoin.get(String.valueOf(root.get("topicName")))), wildcardText));
+                    Join<Bag, Topic> topicJoin = root.join(Bag_.topics, JoinType.LEFT);
+                    preds.add(cb.like(cb.lower(topicJoin.get(Topic_.topicName)), wildcardText));
                     break;
                 default:
                     preds.add(cb.like(cb.lower(root.get(field)), wildcardText));
@@ -1147,6 +1159,20 @@ public class BagService extends StatusProvider {
                                           String dir,
                                           String sort) {
         myLogger.trace("Executing specification.");
+
+        // Text fields are only used when there is text to search for; the UI sends
+        // default field names with an empty search.
+        if (text != null && !text.trim().isEmpty() && fields != null) {
+            for (String field : fields) {
+                requireAllowed(SEARCHABLE_TEXT_FIELDS, field, "search");
+            }
+        }
+        if (filters != null) {
+            for (ExtJsFilter filter : filters) {
+                requireAllowed(FILTERABLE_FIELDS, filter.getProperty(), "filter");
+            }
+        }
+        requireAllowed(SORTABLE_FIELDS, sort, "sort");
 
         Page<Bag> bags;
         Pageable pageReq = createPageRequest(page, size, dir, sort);

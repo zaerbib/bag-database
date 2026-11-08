@@ -1,12 +1,14 @@
 # Audit — Bag Database
 
 > Audit performed on 2026-10-18 on branch `project-refactoring-with-claude` (base `ee3eed9`, version `3.5.3`), without modifying the code.
+> Updated on 2026-10-21: §8 (runtime and deployment, toward embedded Tomcat).
 
 ## 1. Summary
 
 - Spring MVC application packaged as a **WAR** for **Tomcat 9 / Java 11**, with an **ExtJS 6.2** front end bootstrapped from **Thymeleaf** templates.
 - 94 production Java files, **8 test classes, 27 `@Test` methods**, no coverage measurement.
 - Dependencies mostly date from 2017–2022, and several are end-of-life (Spring Boot 2.6, Spring Session 1.x, Hibernate 5.4, H2 1.4).
+- The application can only run inside an **external Tomcat 9**. It has no Spring Boot launcher and uses no auto-configuration (see §8).
 - **Main risks**:
   - In non-LDAP mode, write endpoints are open to anonymous users, including **Docker script execution**.
   - `@Secured` is inactive.
@@ -23,7 +25,7 @@
 | Language / build | Java | 11 |
 | | Maven (no wrapper) | 3.8.5 (Docker build image) |
 | | Packaging | WAR |
-| Runtime | Tomcat | 9 (`tomcat:9-jdk11`) |
+| Runtime | Tomcat (external; the embedded Tomcat from `spring-boot-starter-tomcat` ships in the WAR but is unused) | 9 (`tomcat:9-jdk11`) |
 | Framework | Spring Boot (parent only, manual configuration) | 2.6.6 → Spring 5.3 |
 | | Spring Security (+ LDAP, messaging) | 5.6.x (managed by Boot) |
 | | Spring Session (JDBC) | **1.3.5.RELEASE** |
@@ -219,3 +221,45 @@ The **ordered** list of JS files for `yuicompressor-maven-plugin` in `pom.xml` m
 6. Add JaCoCo, then tests for route security, upload, scripts and storage.
 7. Plan the migration to Spring Boot 3 / Jakarta / Spring Session 3 / Hibernate 6, then the front-end strategy (decouple from Thymeleaf via an API and configuration exposed as JSON).
 8. Update CI (`actions/checkout@v4`, `setup-java@v4`) and Docker images (`eclipse-temurin`).
+9. Run on Spring Boot's embedded Tomcat:
+   - first as an executable WAR that keeps the explicit configuration;
+   - then hand each subsystem over to Boot auto-configuration;
+   - switch to a JAR only once server-side rendering is gone.
+
+   See §8 and plan steps E1–E4 and 27.
+
+---
+
+## 8. Runtime and deployment
+
+The application is a classic Servlet 3.0 WAR started by an **external Tomcat 9**. Spring Boot is only used as the dependency-management parent.
+
+| Aspect | Today | Impact of moving to embedded Tomcat |
+|---|---|---|
+| Bootstrap | `WebAppInitializer` (`AbstractAnnotationConfigDispatcherServletInitializer`) builds a root context and a servlet context | Boot does **not** call `WebApplicationInitializer`s in embedded mode |
+| Filters | `CharacterEncodingFilter` (UTF-8, forced); `SpringSessionInitializer` registers the session repository filter; `SecurityInitializer` registers the security chain and inserts `MultipartFilter` before it | Each one must become a registration bean, in the same order. Boot also maps every `Filter` bean to `/*` automatically |
+| Contexts | `WebMvcConfig` is listed in **both** contexts. Controllers, `@EnableAsync` / `@EnableScheduling` and `@PostConstruct` hooks such as `AdminController.checkAdminAccount` are therefore created twice | A single Boot context creates them once. This is a visible behavior change and must be named |
+| Error page | `<error-page>` in `WEB-INF/web.xml` → `/generalError` | Embedded Tomcat ignores `web.xml`; an `ErrorPageRegistrar` is needed |
+| Profile | `spring.profiles.active=default` is set as a `DispatcherServlet` init parameter | Becomes a property |
+| Uploads | A 50 GB `MultipartConfigElement` on the `DispatcherServlet` | The same bean is picked up by `DispatcherServletAutoConfiguration`. Tomcat's swallow and form-post limits must be checked |
+| Views and resources | Thymeleaf templates and i18n messages under `/WEB-INF/`, static files under `/resources/` (servlet-context resources in `src/main/webapp`) | Works from an executable **WAR**. A JAR needs them moved to the classpath, which is easiest after the front-end split |
+| Server settings | `src/main/docker/server.xml`: port 8080, 150 threads, 20 s timeout, gzip compression, access log, `LockOutRealm` | Become `server.*` / `server.tomcat.*` properties |
+| Context path | `entrypoint.sh` renames `ROOT.war` after `BAGDB_PATH` | `server.servlet.context-path` |
+| Docker | `tomcat:9-jdk11` with `catalina.sh run`; logs in `/usr/local/tomcat/logs` | A JRE image with `exec java -jar` |
+| Build | `spring-boot-starter-tomcat` in compile scope (embedded Tomcat jars ship unused); `tomcat-el-api` / `tomcat-embed-el` pinned to 8.5.15; `tomcat7-maven-plugin` 2.2; no `spring-boot-maven-plugin` | `provided` scope plus `spring-boot-maven-plugin` `repackage`; remove the 8.5 pins and the tomcat7 plugin |
+| Auto-configuration | None. DataSource, JPA, Liquibase, Spring Session 1.3.5 (`@EnableJdbcHttpSession`), Thymeleaf, MVC (`@EnableWebMvc`) and Security are wired by hand | Turning on `@SpringBootApplication` in one go would conflict with the hand-wired beans: a second Liquibase run, a second DataSource or Thymeleaf resolver, and a session auto-configuration written for Spring Session 2.x. Migrate one subsystem at a time |
+| Native code | OpenCV is loaded with `nu.pattern.OpenCV.loadShared()` | Must be checked when loading from a nested JAR inside the executable WAR |
+
+**Options compared:**
+- **Embedded Tomcat with the explicit configuration (executable WAR).**
+  - Small, behavior-preserving change.
+  - The WAR still deploys to an external Tomcat, so it is reversible.
+  - It does not depend on the Spring Session or Security upgrades.
+- **Full Boot auto-configuration in one step.**
+  - Collides with every hand-wired subsystem.
+  - Needs Spring Session 2.x first.
+  - Cannot be reverted piece by piece.
+- **Executable JAR right away.**
+  - Blocked by the `/WEB-INF/` views until server-side rendering is removed.
+
+**Recommendation:** the first option now, then progressive auto-configuration, then optionally a JAR. These are plan steps E1–E3, then E4, then 27.

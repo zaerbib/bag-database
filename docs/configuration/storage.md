@@ -12,10 +12,10 @@ permalink: /configuration/storage
 For scenarios where you just want the Bag Database to index bag files in a single directory on
 the local filesystem, see [Configuration](configuration.md).
 
-The Bag Database can also be configured to index files in multiple local directories or S3-compatible
-storage buckets, in which case you will need to create a custom `settings.yml` file.  This file
-should be mounted at `${HOME}/.ros-bag-database/settings.yml` inside the Docker container, or outside
-the container in the Tomcat user's home directory if running as a standalone Tomcat server.
+The Bag Database can also be configured to index files in multiple local directories, in which case
+you will need to create a custom `settings.yml` file.  This file
+should be mounted at `${HOME}/.ros-bag-database/settings.yml` inside the Docker container, or in the
+home directory of the user that runs the Bag Database if running it [without Docker](../installation/standalone).
 
 Storage backends are configured by adding a `storageConfigurations` key to the `settings.yml` file
 that contains a list of serialized YAML configuration objects.  Each of these objects maps to a
@@ -50,34 +50,13 @@ Configuration Class: `com.github.swrirobotics.bags.storage.filesystem.Filesystem
 | `isLocal` | Enables performance improvements for local filesystems; should always be true | `true` |
 | `dockerPath` | The mount point where this directory is mounted inside the Docker-in-Docker container | `/bags` |
 
-### S3-Compatible Storage
-
-Indexes bags in an S3-compatible storage service.  The service will be polled at a specified interval
-for new bags.  Keep in mind that the API calls and downloads from this service may incur charges.
-
-Operations that can cause the Bag Database to download a bag include:
-1. Indexing a new bag
-2. Downloading a bag through the web interface
-3. Viewing an image
-4. Streaming a video topic
-5. Running a script on a bag
-
-Configuration Class: `com.github.swrirobotics.bags.storage.s3.S3BagStorageConfigImpl`
-
-| Field | Description | Default Value |
-| ----- | ----------- | ------------- |
-| `storageId` | Unique identifier for this backend | |
-| `accessKey` | Access key for this S3 bucket; *required* | |
-| `secretKey` | Secret key for this S3 bucket; *required* | |
-| `endPoint` | Connection endpoint for this S3 bucket; only required for non-Amazon services | |
-| `bucket` | Name of the bucket to use for bag storage | |
-| `region` | Region for this S3 bucket; only required for Amazon services | |
-| `updateIntervalMs` | How often to check the bucket for new files, in milliseconds | `10000` |
+S3-compatible storage is no longer supported.  A `settings.yml` that still lists an
+`S3BagStorageConfigImpl` backend cannot be read at all: the Bag Database falls back to its built-in
+defaults, including the database connection, until that entry is removed.
 
 ## Example
 
-Here's an example that will mount two local directories, `/home/user/bags` and `/home/user/bags`, and
-an S3 bucket hosted at [Backblaze](https://www.backblaze.com/).
+Here's an example that will mount two local directories, `/home/user/bags` and `/home/user2/bags2`.
 
 ### `settings.yml`:
 
@@ -112,12 +91,6 @@ storageConfigurations:
         storageId: 'Local Storage 2'
         isLocal: true
         dockerPath: /bags2
-    - !com.github.swrirobotics.bags.storage.s3.S3BagStorageConfigImpl
-        storageId: 'Backblaze'
-        accessKey: 'YOUR_ACCESS_KEY'
-        secretKey: 'YOUR_SECRET_KEY'
-        endPoint: 'YOUR_END_POINT'
-        bucket: 'YOUR_BUCKET_NAME'
 ```
 
 ### `docker-compose.yml`:

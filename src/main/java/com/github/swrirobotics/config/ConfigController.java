@@ -31,6 +31,7 @@
 package com.github.swrirobotics.config;
 
 import com.github.swrirobotics.support.web.Configuration;
+import com.github.swrirobotics.support.web.ConfigurationDto;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,14 +78,16 @@ public class ConfigController {
             myLogger.info("getConfigValues");
             Map<String, Object> response = Maps.newHashMap();
             response.put("success", true);
-            response.put("data", myConfigService.getConfiguration());
-            myLogger.info("JDBC URL: " + ((Configuration)response.get("data")).getJdbcUrl());
+            ConfigurationDto data = ConfigurationDto.from(myConfigService.getConfiguration());
+            response.put("data", data);
+            myLogger.info("JDBC URL: " + data.getJdbcUrl());
             return response;
         }
         else {
             myLogger.info("setConfigValues");
             Map<String, Object> response = Maps.newHashMap();
             try {
+                keepBlankSecrets(config, myConfigService.getConfiguration());
                 myConfigService.setConfiguration(config);
                 response.put("success", true);
             }
@@ -95,5 +98,33 @@ public class ConfigController {
             }
             return response;
         }
+    }
+
+    /**
+     * The web interface never receives secrets, so a secret submitted blank
+     * means "unchanged". Only applied to web form saves: other callers of
+     * ConfigService.setConfiguration (e.g. the admin password startup hook)
+     * must be able to clear a secret.
+     */
+    private static void keepBlankSecrets(Configuration submitted, Configuration current) {
+        if (isBlank(submitted.getJdbcPassword())) {
+            submitted.setJdbcPassword(current.getJdbcPassword());
+        }
+        if (isBlank(submitted.getGoogleApiKey())) {
+            submitted.setGoogleApiKey(current.getGoogleApiKey());
+        }
+        if (isBlank(submitted.getBingKey())) {
+            submitted.setBingKey(current.getBingKey());
+        }
+        if (isBlank(submitted.getAdminPassword())) {
+            submitted.setAdminPassword(current.getAdminPassword());
+        }
+        if (isBlank(submitted.getLdapBindPassword())) {
+            submitted.setLdapBindPassword(current.getLdapBindPassword());
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isEmpty();
     }
 }

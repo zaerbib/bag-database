@@ -65,10 +65,12 @@ Ext.define('BagDatabase.views.ConfigWindow', {
         }, {
             fieldLabel: 'JDBC Password',
             inputType: 'password',
-            name: 'jdbcPassword'
+            name: 'jdbcPassword',
+            emptyText: 'Leave blank to keep current value'
         }, {
             fieldLabel: 'Google API Key',
-            name: 'googleApiKey'
+            name: 'googleApiKey',
+            emptyText: 'Leave blank to keep current value'
         }, {
             fieldLabel: 'Temporary Script Path',
             name: 'scriptTmpPath'
@@ -105,7 +107,8 @@ Ext.define('BagDatabase.views.ConfigWindow', {
             inputValue: true
         }, {
             fieldLabel: 'Bing Maps API Key',
-            name: 'bingKey'
+            name: 'bingKey',
+            emptyText: 'Leave blank to keep current value'
         }, {
             fieldLabel: 'Vehicle Name Topics',
             name: 'vehicleNameTopics'

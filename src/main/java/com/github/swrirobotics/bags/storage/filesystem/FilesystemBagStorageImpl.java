@@ -317,9 +317,14 @@ public class FilesystemBagStorageImpl extends StatusProvider implements BagStora
 
     @Override
     public void uploadBag(MultipartFile file, String targetDirectory) throws IOException {
-        java.nio.file.Path inputPath = Paths.get(targetDirectory).normalize();
+        java.nio.file.Path base = Paths.get(myConfig.basePath).toAbsolutePath().normalize();
+        java.nio.file.Path targetPath = base.resolve(UploadPaths.relativeDirectory(targetDirectory)).normalize();
+        if (!targetPath.startsWith(base)) {
+            throw new IOException("Target directory is outside of the storage base path.");
+        }
+        String filename = UploadPaths.sanitizeFilename(file.getOriginalFilename());
 
-        File path = new File(myConfig.basePath + "/" + inputPath);
+        File path = targetPath.toFile();
         myLogger.debug("Checking path: " + path.getAbsolutePath());
 
         if (path.exists()) {
@@ -336,7 +341,7 @@ public class FilesystemBagStorageImpl extends StatusProvider implements BagStora
             throw new IOException("Failed to create target directory.  Is the destination writable?");
         }
 
-        File targetFile = new File(path.getAbsolutePath() + "/" + file.getOriginalFilename());
+        File targetFile = targetPath.resolve(filename).toFile();
 
         if (targetFile.exists()) {
             throw new IOException("Not overwriting existing file.");

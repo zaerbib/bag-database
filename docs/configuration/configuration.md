@@ -10,7 +10,7 @@ permalink: /configuration/
 # Configuration
 
 The Bag Database stores its configuration in a file at `${HOME}/.ros-bag-database/settings.yml`,
-where `${HOME}` is the home directory of the user that the Tomcat server is running as.
+where `${HOME}` is the home directory of the user that the Bag Database is running as.
 
 If you are only serving files from a single directory on the local filesystem, you don't need to
 edit this file; it will be automatically generated from the environment variables set on the container.
@@ -63,7 +63,12 @@ vehicleNameTopics:
 
 
 
-If you are running the Bag Database in a standalone Tomcat server, some of these values can be edited
+If you are running the Bag Database [without Docker](../installation/standalone), some of these values can be edited
 through the [Configuration](../web-interface/administration#bag-database-configuration)
 panel.  Note that if you are running inside a Docker container, they will be overwritten when the
 container restarts.
+
+Secrets (`jdbcPassword`, `adminPassword`, `ldapBindPassword`, `googleApiKey` and `bingKey`) are
+never sent to the web interface.  Their fields
+in the Configuration panel are always shown empty; leaving one blank when saving keeps its current
+value.  To clear a secret, edit `settings.yml` directly.

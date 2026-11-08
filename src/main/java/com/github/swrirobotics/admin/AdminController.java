@@ -42,6 +42,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.access.annotation.Secured;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -93,11 +97,21 @@ public class AdminController {
                         if (password != null && !password.isEmpty()) {
                             myLogger.info("Setting admin password from config file.");
                             config.setAdminPassword("");
+                            // setConfiguration is @Secured("ROLE_ADMIN") and nobody is logged in
+                            // during startup, so run it as the system.
+                            SecurityContext previousContext = SecurityContextHolder.getContext();
+                            SecurityContext systemContext = SecurityContextHolder.createEmptyContext();
+                            systemContext.setAuthentication(new UsernamePasswordAuthenticationToken(
+                                    "system", null, AuthorityUtils.createAuthorityList("ROLE_ADMIN")));
+                            SecurityContextHolder.setContext(systemContext);
                             try {
                                 myConfigService.setConfiguration(config);
                             }
                             catch (IOException e) {
                                 myLogger.error("Error setting configuration", e);
+                            }
+                            finally {
+                                SecurityContextHolder.setContext(previousContext);
                             }
                         }
                         else {

@@ -23,6 +23,10 @@ Bag Database is starting up.
 
 Enter that password here to log in, and then you will have access to the administration panels.
 
+Only `ROLE_ADMIN` accounts can use the administration and configuration panels and save, run
+or delete scripts.  This includes LDAP mode: LDAP users who are not granted `ROLE_ADMIN` can
+still edit and tag bags, but must use the built-in `admin` account for these functions.
+
 ## Bag Database Administration
 
 Each of these buttons can be used to force the bag database to perform certain actions.
@@ -82,7 +86,7 @@ Changes the admin password.
 
 This panel can be used to view or modify various configuration options for the Bag Database.
 This is only useful for modifying the configuration if you are running the Bag Database
-in a standalone Tomcat server; if you are running it using the Docker image, these values
+without Docker; if you are running it using the Docker image, these values
 will be overwritten every time the container starts based on its environment variables.
 
 ![Bag Database Configuration](../assets/images/configuration.png)

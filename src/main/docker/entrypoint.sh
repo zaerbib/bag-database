@@ -4,14 +4,15 @@
 ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 BAGDB_PATH=${BAGDB_PATH:-}
 BING_KEY=${BING_KEY:-}
-DB_DRIVER=${DB_DRIVER:-org.hsqldb.jdbcDriver}
+DB_DRIVER=${DB_DRIVER:-org.postgresql.Driver}
 DB_PASS=${DB_PASS:-}
-DB_URL=${DB_URL:-jdbc:hsqldb:mem:testdb}
-DB_USER=${DB_USER:-sa}
+DB_URL=${DB_URL:-jdbc:postgresql://postgres/bag_database}
+DB_USER=${DB_USER:-bag_database}
 DEBUG_JAVASCRIPT=${DEBUG_JAVASCRIPT:-false}
 DOCKER_HOST=${DOCKER_HOST:-}
 FASTER_CODEC=${FASTER_CODEC:-false}
 GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+JAVA_OPTS=${JAVA_OPTS:-}
 GPS_TOPICS='['$(echo "${GPS_TOPICS}" | perl -pe 's#([/\w+]+)#"\1"#g')']'
 LDAP_BINDDN=${LDAP_BINDDN:-}
 LDAP_BIND_PASSWORD=${LDAP_BIND_PASSWORD:-}
@@ -33,7 +34,7 @@ VEHICLE_NAME_TOPICS='['$(echo "${VEHICLE_NAME_TOPICS}" | perl -pe 's#([/\w+]+)#"
 # the variables out to it
 if [ ! -f "${HOME}/.ros-bag-database/settings.yml" ]
 then
-    mkdir "${HOME}/.ros-bag-database"
+    mkdir -p "${HOME}/.ros-bag-database"
     echo "!com.github.swrirobotics.support.web.Configuration
 adminPassword: ${ADMIN_PASSWORD}
 bingKey: ${BING_KEY}
@@ -63,12 +64,20 @@ vehicleNameTopics: ${VEHICLE_NAME_TOPICS}
 " > "${HOME}/.ros-bag-database/settings.yml"
 fi
 
-# If BAGDB_PATH was specified, rename the ROOT.war file; Tomcat will
-# automatically extract it to the new path
-if [ -f "/usr/local/tomcat/webapps/ROOT.war" ] && [ -n "${BAGDB_PATH}" ]
+# If BAGDB_PATH was specified, serve the application from that subdirectory. Accept the forms the
+# former ROOT.war rename accepted: surrounding slashes, and Tomcat's "#" for nested paths (a#b = /a/b).
+BAGDB_PATH="${BAGDB_PATH#/}"
+BAGDB_PATH="${BAGDB_PATH%/}"
+BAGDB_PATH="${BAGDB_PATH//#//}"
+CONTEXT_PATH_ARG=""
+if [ -n "${BAGDB_PATH}" ]
 then
-  mv "/usr/local/tomcat/webapps/ROOT.war" "/usr/local/tomcat/webapps/${BAGDB_PATH}.war"
+  CONTEXT_PATH_ARG="--server.servlet.context-path=/${BAGDB_PATH}"
 fi
 
+# Same file permissions as the former Tomcat image (catalina.sh sets umask 0027)
+umask 0027
 
-catalina.sh run
+# exec, so that the JVM receives SIGTERM from docker stop and shuts down gracefully.
+# JAVA_OPTS is split on spaces, so individual options cannot contain spaces.
+exec java ${JAVA_OPTS} -jar /app/bag-database.jar ${CONTEXT_PATH_ARG:+"$CONTEXT_PATH_ARG"}
